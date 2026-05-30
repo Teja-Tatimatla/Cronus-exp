@@ -7,7 +7,7 @@ extern uint32_t _sdata, _edata, _sidata, _sbss, _ebss;
 extern const void *vector_table[];
 int main(void);
 
-void reset_handler(void) {
+void Reset_Handler(void) {
   uint32_t *src  = &_sidata;
   uint32_t *dest = &_sdata;
   while (dest < &_edata) {

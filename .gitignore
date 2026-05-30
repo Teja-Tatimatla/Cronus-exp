@@ -62,3 +62,6 @@ dkms.conf
 
 #zed
 compile_commands.json
+
+#cache
+.cache

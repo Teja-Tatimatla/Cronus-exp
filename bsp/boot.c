@@ -3,7 +3,7 @@
    image vector table (IVT) the boot ROM reads to find the application. */
 
 extern uint32_t _flash_image_len;
-extern void reset_handler(void);
+extern void Reset_Handler(void);
 
 typedef struct __attribute__((packed)) {
   uint32_t tag;
@@ -97,7 +97,7 @@ const uint32_t boot_data[3] = {
 __attribute__((section(".ivt"), used))
 const uint32_t image_vector_table[8] = {
   0x402000D1,
-  (uint32_t)&reset_handler,
+  (uint32_t)&Reset_Handler,
   0,
   0,
   (uint32_t)boot_data,

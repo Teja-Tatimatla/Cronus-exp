@@ -11,6 +11,7 @@ add_executable(cronus.elf
   bsp/boot.c
   bsp/clock.c
   app/main.c
+  drivers/uart.c
 )
 
 target_include_directories(cronus.elf PRIVATE

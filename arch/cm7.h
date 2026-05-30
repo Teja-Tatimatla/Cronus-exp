@@ -3,7 +3,7 @@
 /* ARM Cortex-M7 (ARMv7-M) core registers - System Control Space (0xE000_xxxx).
    Architectural: identical on any Cortex-M7, so they live in arch/, not bsp/. */
 
-#define SCB_VTOR (*(volatile uint32_t *)0xE000ED08)
+#define SCB_VTOR           (*(volatile uint32_t *)0xE000ED08)
 
 /* Debug Exception and Monitor Control */
 #define DEMCR              (*(volatile uint32_t *)0xE000EDFC)
@@ -24,3 +24,6 @@
 #define SYST_CSR_ENABLE    (1u << 0)
 #define SYST_CSR_TICKINT   (1u << 1)
 #define SYST_CSR_CLKSOURCE (1u << 2)
+
+/* NVIC Interrupt Set-Enabled Registers */
+#define NVIC_ISER(n)       (*(volatile uint32_t *)(0xE000E100 + 4u*(n)))

@@ -5,7 +5,7 @@ MEMORY {
   RAM       (rwx) : ORIGIN = 0x20200000, LENGTH = 512k
 }
 
-ENTRY(reset_handler)
+ENTRY(Reset_Handler)
 
 SECTIONS {
   .image : {

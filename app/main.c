@@ -4,6 +4,7 @@
 #include <clock.h>
 #include <dwt.h>
 #include <systick.h>
+#include <uart.h>
 
 static void init_led(void) {
   CCM_CCGR0 |= (3u << 30);
@@ -21,15 +22,12 @@ static void init_scope_pin(void) {
 
 int main(void) {
   switch_clock_600mhz();
-  init_led();
-  init_scope_pin();
-  init_sys_tick();
-
-  uint32_t last_tick = 0;
+  init_uart();
+  uart_puts("Cronus online\n");
   while (1) {
-    if((get_tick_count() - last_tick) >= 500u) {
-      GPIO2_DR ^= LED_PIN;
-      last_tick += 500u;
+    int c = uart_getc();
+    if(c >= 0) {
+      uart_putc((char)c);
     }
   }
 }
