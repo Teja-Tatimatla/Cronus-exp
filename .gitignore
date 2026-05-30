@@ -53,3 +53,12 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# macos
+.DS_Store
+
+# build directories
+/build/
+
+#zed
+compile_commands.json
