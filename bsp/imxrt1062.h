@@ -30,14 +30,22 @@
 #define IOMUXC_PAD_B0_03    (*(volatile uint32_t *)0x401F8338)
 
 /* IOMUX - pin mux/pad fro pin 14 (GPIO_AD_B1_02) */
-#define IOMUXC_MUX_AD_B1_02 (*(volatile uint32_t *)0x401F8104)
+#define IOMUXC_MUX_AD_B1_02  (*(volatile uint32_t *)0x401F8104)
 #define IOMUXC_PAD_AD_B1_02  (*(volatile uint32_t *)0x401F82F4)
+
+/* IOMUX - pin mux/pad fro pin 16 (GPIO_AD_B1_07) */
+#define IOMUXC_MUX_AD_B1_07  (*(volatile uint32_t *)0x401F8118)
+#define IOMUXC_PAD_AD_B1_07  (*(volatile uint32_t *)0x401F8308)
+
+/* IOMUX - pin mux/pad fro pin 17 (GPIO_AD_B1_06) */
+#define IOMUXC_MUX_AD_B1_06  (*(volatile uint32_t *)0x401F8114)
+#define IOMUXC_PAD_AD_B1_06  (*(volatile uint32_t *)0x401F8304)
 
 /* GPIO2 */
 #define GPIO2_GDIR          (*(volatile uint32_t *)0x401BC004)
 #define GPIO2_DR            (*(volatile uint32_t *)0x401BC000)
 
-/* GPIO 6*/
+/* GPIO 6 */
 #define GPIO6_GDIR          (*(volatile uint32_t *)0x42000004)
 #define GPIO6_DR            (*(volatile uint32_t *)0x42000000)
-#define IOMUXC_GPR_GRP26    (*(volatile uint32_t *)0x400AC068)
+#define IOMUXC_GPR_GPR26    (*(volatile uint32_t *)0x400AC068)

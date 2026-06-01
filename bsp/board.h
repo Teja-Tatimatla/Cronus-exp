@@ -6,7 +6,9 @@
 
 /* Logic-analyzer scope pins, reserved for later exercises:
    14 = SysTick, 15 = PendSV, 16 = Task A, 17 = Task B. */
-#define SCOPE_PIN             (1u << 18)
+#define SCOPE_PIN_14          (1u << 18)
+#define SCOPE_PIN_16          (1u << 23)
+#define SCOPE_PIN_17          (1u << 22)
 
 
 /* LPUART6 */

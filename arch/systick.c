@@ -19,7 +19,7 @@ uint32_t get_tick_count(void) {
 }
 
 void SysTick_Handler(void) {
-  GPIO6_DR |= SCOPE_PIN;
+  GPIO6_DR |= SCOPE_PIN_14;
   tick_count++;
-  GPIO6_DR &= ~SCOPE_PIN;
+  GPIO6_DR &= ~SCOPE_PIN_16;
 }
