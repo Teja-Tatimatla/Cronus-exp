@@ -16,6 +16,14 @@ static uint32_t stack_b[STACK_SIZE]     __attribute__((aligned(8)));
 uint32_t* tasks_sp[2];
 volatile uint32_t current;
 
+static inline void critical_enter(void) {
+  __asm volatile ("cpsid i" ::: "memory");
+}
+
+static inline void critical_exit(void) {
+  __asm volatile ("cpsie i" ::: "memory");
+}
+
 static void init_led(void) {
   CCM_CCGR0 |= (3u << 30);
   IOMUXC_MUX_B0_03 = 5;
@@ -83,9 +91,10 @@ static void task_a(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_16;
     n++;
+    critical_enter();
     uart_printf("A:%d\r\n", n);
+    critical_exit();
     GPIO6_DR ^= SCOPE_PIN_16;
-    yield();
   }
 }
 
@@ -95,9 +104,10 @@ static void task_b(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_17;
     n++;
+    critical_enter();
     uart_printf("B:%d\r\n", n);
+    critical_exit();
     GPIO6_DR ^= SCOPE_PIN_17;
-    yield();
   }
 }
 
@@ -117,6 +127,7 @@ int main(void) {
   tasks_sp[0] = setup_initial_stack(&stack_a[STACK_SIZE], task_a);
   tasks_sp[1] = setup_initial_stack(&stack_b[STACK_SIZE], task_b);
 
+  init_sys_tick();
   start_schedule();
 
   while (1) {
