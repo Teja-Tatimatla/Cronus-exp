@@ -27,3 +27,7 @@
 
 /* NVIC Interrupt Set-Enabled Registers */
 #define NVIC_ISER(n)       (*(volatile uint32_t *)(0xE000E100 + 4u*(n)))
+
+/* PendSV */
+#define SCB_ICSR           (*(volatile uint32_t *)0xE000ED04)
+#define ICSR_PENDSVSET     (1u << 28)

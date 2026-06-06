@@ -103,7 +103,7 @@ void uart_printf(const char* fmt_str, ...) {
         break;
 
       case 's':
-        const char* s = va_arg(ap, unsigned char *);
+        const unsigned char* s = va_arg(ap, unsigned char *);
         while(*s) {
           uart_putc(*s++);
         }

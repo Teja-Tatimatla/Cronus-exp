@@ -1,3 +1,4 @@
+#include "cm7.h"
 #include <stdint.h>
 
 #include <imxrt1062.h>
@@ -9,10 +10,11 @@
 #include <context.h>
 
 #define STACK_SIZE 256
+static uint32_t stack_a[STACK_SIZE]     __attribute__((aligned(8)));
+static uint32_t stack_b[STACK_SIZE]     __attribute__((aligned(8)));
 
-static uint32_t stack_a[STACK_SIZE]    __attribute__((aligned(8)));
-static uint32_t stack_b[STACK_SIZE]    __attribute__((aligned(8)));
-static uint32_t *sp_a, *sp_b;
+uint32_t* tasks_sp[2];
+volatile uint32_t current;
 
 static void init_led(void) {
   CCM_CCGR0 |= (3u << 30);
@@ -41,9 +43,22 @@ static void init_scope_pins(void) {
   GPIO6_GDIR |= SCOPE_PIN_17;
 }
 
+static void task_exit() {
+  while(1) {
+    uart_printf("Task exited\r\n");
+  }
+}
+
 static uint32_t* setup_initial_stack(uint32_t* stack_top, void (*entry)(void)) {
   uint32_t* sp = stack_top;
-  *(--sp) = (uint32_t)entry;   // LR
+  *(--sp) = 0x01000000;   //xPSR
+  *(--sp) = (uint32_t)entry & ~1u;  //PC
+  *(--sp) = (uint32_t)task_exit;   // LR
+  *(--sp) = 0;  //r12
+  *(--sp) = 0;  //r3
+  *(--sp) = 0;  //r2
+  *(--sp) = 0;  //r1
+  *(--sp) = 0;  //r0
 
   *(--sp) = 0;  // r11
   *(--sp) = 0;  // r10
@@ -56,15 +71,21 @@ static uint32_t* setup_initial_stack(uint32_t* stack_top, void (*entry)(void)) {
   return sp;
 }
 
+static void yield() {
+  SCB_ICSR = ICSR_PENDSVSET;
+  __asm volatile ("dsb");
+  __asm volatile ("isb");
+}
+
 static void task_a(void) {
   int n = 0;
 
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_16;
     n++;
-    uart_printf("A:%d\n", n);
+    uart_printf("A:%d\r\n", n);
     GPIO6_DR ^= SCOPE_PIN_16;
-    context_switch(&sp_a, sp_b);
+    yield();
   }
 }
 
@@ -74,25 +95,29 @@ static void task_b(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_17;
     n++;
-    uart_printf("B:%d\n", n);
+    uart_printf("B:%d\r\n", n);
     GPIO6_DR ^= SCOPE_PIN_17;
-    context_switch(&sp_b, sp_a);
+    yield();
   }
+}
+
+static void start_schedule() {
+  SHPR3 = ((SHPR3 & ~(0xFu << 16)) | (0xFFu << 16));
+  current = 0;
+  __asm volatile ("svc 0");
 }
 
 int main(void) {
   switch_clock_600mhz();
   init_uart();
   init_scope_pins();
-  uart_printf("Cronus online\n");
+  uart_printf("Cronus online\r\n");
   //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
 
-  sp_a = setup_initial_stack(&stack_a[STACK_SIZE], task_a);
-  sp_b = setup_initial_stack(&stack_b[STACK_SIZE], task_b);
+  tasks_sp[0] = setup_initial_stack(&stack_a[STACK_SIZE], task_a);
+  tasks_sp[1] = setup_initial_stack(&stack_b[STACK_SIZE], task_b);
 
-
-  uint32_t* throwaway;
-  context_switch(&throwaway, sp_a);
+  start_schedule();
 
   while (1) {
     __asm volatile ("nop");
