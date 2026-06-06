@@ -102,7 +102,7 @@ static void task_b(void) {
 }
 
 static void start_schedule() {
-  SHPR3 = ((SHPR3 & ~(0xFu << 16)) | (0xFFu << 16));
+  SHPR3 = ((SHPR3 & ~(0xFFu << 16)) | (0xFFu << 16));
   current = 0;
   __asm volatile ("svc 0");
 }
