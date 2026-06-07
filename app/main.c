@@ -96,12 +96,12 @@ int main(void) {
   uart_printf("Cronus online\r\n");
   //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
 
-  create_task(stack_a, task_a, STACK_SIZE);
-  create_task(stack_b, task_b, STACK_SIZE);
-  create_task(stack_c, task_c, STACK_SIZE);
+  create_task(stack_a, task_a, STACK_SIZE, 9);
+  create_task(stack_b, task_b, STACK_SIZE, 9);
+  create_task(stack_c, task_c, STACK_SIZE, 9);
 
   init_sys_tick();
-  start_schedule();
+  start_scheduler();
 
   while (1) {
     __asm volatile ("nop");

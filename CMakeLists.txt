@@ -9,8 +9,8 @@ add_executable(cronus.elf
   arch/dwt.c
   arch/systick.c
   arch/context.S
-  arch/tasks.c
   arch/port.c
+  kernel/tasks.c
   bsp/boot.c
   bsp/clock.c
   app/main.c

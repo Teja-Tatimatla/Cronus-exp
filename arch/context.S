@@ -6,7 +6,7 @@
   .global SVC_Handler
   .thumb_func
 SVC_Handler:
-  ldr   r0, =curr_tcb
+  ldr   r0, =curr_task
   ldr   r0, [r0]
   ldr   r0, [r0]
   ldmia r0!, {r4-r11}
@@ -23,12 +23,12 @@ PendSV_Handler:
   mrs   r0, psp
   stmdb r0!, {r4-r11}
 
-  ldr   r1, =curr_tcb
+  ldr   r1, =curr_task
   ldr   r2, [r1]
   str   r0, [r2]
 
   push  {r1, lr}
-  bl    schedule
+  bl    scheduler
   pop   {r1, lr}
 
   ldr   r2, [r1]
