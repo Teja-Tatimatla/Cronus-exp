@@ -31,3 +31,17 @@
 /* PendSV */
 #define SCB_ICSR           (*(volatile uint32_t *)0xE000ED04)
 #define ICSR_PENDSVSET     (1u << 28)
+
+
+/* BASEPRI operations for critical sections */
+static inline void arch_set_basepri(uint32_t v) {
+  __asm volatile ("msr basepri, %0" :: "r"(v): "memory");
+  __asm volatile ("dsb");
+  __asm volatile ("isb");
+}
+
+static inline uint32_t arch_get_basepri(void) {
+  uint32_t v;
+  __asm volatile ("mrs %0, basepri" :"=r"(v));
+  return v;
+}

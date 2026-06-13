@@ -8,20 +8,12 @@
 #include <uart.h>
 #include <context.h>
 #include <cronus/tasks.h>
+#include <cronus/critical.h>
 
 #define STACK_SIZE 256
 uint32_t stack_a[STACK_SIZE]     __attribute__((aligned(8)));
 uint32_t stack_b[STACK_SIZE]     __attribute__((aligned(8)));
 uint32_t stack_c[STACK_SIZE]     __attribute__((aligned(8)));
-
-
-static inline void critical_enter(void) {
-  __asm volatile ("cpsid i" ::: "memory");
-}
-
-static inline void critical_exit(void) {
-  __asm volatile ("cpsie i" ::: "memory");
-}
 
 static void init_led(void) {
   CCM_CCGR0 |= (3u << 30);
@@ -56,9 +48,9 @@ static void task_a(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_14;
     n++;
-    critical_enter();
+    enter_critical();
     uart_printf("A:%d\r\n", n);
-    critical_exit();
+    exit_critical();
     GPIO6_DR ^= SCOPE_PIN_14;
   }
 }
@@ -69,9 +61,9 @@ static void task_b(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_16;
     n++;
-    critical_enter();
+    enter_critical();
     uart_printf("B:%d\r\n", n);
-    critical_exit();
+    exit_critical();
     GPIO6_DR ^= SCOPE_PIN_16;
   }
 }
@@ -82,9 +74,9 @@ static void task_c(void) {
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_17;
     n++;
-    critical_enter();
+    enter_critical();
     uart_printf("C:%d\r\n", n);
-    critical_exit();
+    exit_critical();
     GPIO6_DR ^= SCOPE_PIN_17;
   }
 }
