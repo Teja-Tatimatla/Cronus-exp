@@ -10,10 +10,12 @@ add_executable(cronus.elf
   arch/systick.c
   arch/context.S
   arch/port.c
+  arch/fault.c
   kernel/tasks.c
   kernel/critical.c
   bsp/boot.c
   bsp/clock.c
+  bsp/gpt.c
   app/main.c
   drivers/uart.c
 )

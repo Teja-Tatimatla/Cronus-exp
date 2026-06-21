@@ -15,26 +15,46 @@ SECTIONS {
     KEEP(*(.boot_data))
   } > FLASH
 
-  .isr_vector ALIGN(1024) : {
+  .bootcode : {
+    . = ALIGN(4);
+    KEEP(*(.bootcode))
+    . = ALIGN(4);
+  } > FLASH      /* Reset_Handler + copy loop: runs XIP */
+
+  .isr_vector : {
+    . = ALIGN(1024);
+    _svector = .;
     KEEP(*(.isr_vector))
-  } > FLASH
+    . = ALIGN(4);
+    _evector = .;
+  } > ITCM AT > FLASH
+  _sivector = LOADADDR(.isr_vector);
 
   .text : {
+    . = ALIGN(4);
+    _stext = .;
     *(.text*)
     *(.rodata*)
-  } > FLASH
+    . = ALIGN(4);
+    _etext = .;
+  } > ITCM AT > FLASH
+  _sitext = LOADADDR(.text);
 
   .data : {
+    . = ALIGN(4);
     _sdata = .;
     *(.data*)
+    . = ALIGN(4);
     _edata = .;
   } > DTCM AT > FLASH
   _sidata = LOADADDR(.data);
 
   .bss : {
+    . = ALIGN(4);
     _sbss = .;
     *(.bss*)
     *(COMMON)
+    . = ALIGN(4);
     _ebss = .;
   } > DTCM
 

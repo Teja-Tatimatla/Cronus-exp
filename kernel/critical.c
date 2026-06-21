@@ -15,3 +15,21 @@ void exit_critical(void) {
     arch_set_basepri(0);
   }
 }
+
+uint32_t enter_critical_isr(void) {
+  uint32_t prev_basepri = arch_get_basepri();
+  arch_set_basepri(MAX_SYSCALL_PRIO);
+  return prev_basepri;
+}
+
+void exit_critical_isr(uint32_t prev_basepri) {
+  arch_set_basepri(prev_basepri);
+}
+
+void enter_critical_primask(void) {
+  arch_disable_irq();
+}
+
+void exit_critical_primask(void) {
+  arch_enable_irq();
+}

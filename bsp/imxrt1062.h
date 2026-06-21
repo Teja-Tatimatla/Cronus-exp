@@ -10,8 +10,11 @@
 #define PERIPH_CLK_SEL      (1u << 25)
 
 #define CCM_CCGR3           (*(volatile uint32_t *)0x400FC074)
+#define CCM_CCGR1           (*(volatile uint32_t *)0x400FC06C)
 
 #define CCM_CSCDR1          (*(volatile uint32_t *)0x400FC024)
+
+#define CCM_CLPCR           (*(volatile uint32_t *)0x400FC054)
 
 /* IOMUX - pin mux/pad for pin 0 (GPIO_AD_B0_03)*/
 #define IOMUXC_MUX_AD_B0_03 (*(volatile uint32_t *)0x401F80C8)
