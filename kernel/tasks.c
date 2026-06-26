@@ -7,9 +7,14 @@
 #include <cronus/critical.h>
 #include <systick.h>
 #include <cronus/config.h>
+#include <uart.h>
+#include <mpu.h>
 
 #define MAX_TASKS 8
 #define MAX_PRIO  32
+#define STACK_FILL 0xA5A5A5A5u
+#define SW_CANARY_WIDTH 4u
+
 static uint32_t num_tasks = 0;
 
 static tcb_t tcbs[MAX_TASKS];
@@ -21,7 +26,7 @@ static tcb_t* ready_lists[MAX_PRIO] = {0};
 static tcb_t* delayed_list = NULL;
 static tcb_t* delayed_list_overflow = NULL;
 
-static uint32_t idle_stack[128] __attribute__((aligned(8)));
+static uint32_t idle_stack[128] __attribute__((aligned(32)));
 
 extern uint32_t* init_task(uint32_t* stack_top, void (*entry)(void), void (*task_return)(void));
 
@@ -48,8 +53,8 @@ static void tickless_sleep(uint32_t idle_ticks) {
   SYST_CSR = 0;             /* stop 1 ms tick; GPT keeps time */
 
   gpt_start(interval);
-  __asm volatile ("dsb");
-  __asm volatile ("wfi");
+  __asm volatile ("dsb" ::: "memory");
+  __asm volatile ("wfi" ::: "memory");
 
   uint32_t elapsed = gpt_stop_return_elapsed();
   uint32_t slept_ticks = elapsed / per_tick;
@@ -130,8 +135,8 @@ void idle_task() {
 
 void yield(void) {
   SCB_ICSR = ICSR_PENDSVSET;
-  __asm volatile ("dsb");
-  __asm volatile ("isb");
+  __asm volatile ("dsb" ::: "memory");
+  __asm volatile ("isb" ::: "memory");
 }
 
 static void insert_ready_task(tcb_t* t) {
@@ -287,7 +292,7 @@ void kernel_tick(uint32_t now) {
 }
 
 void start_scheduler(void) {
-  create_task(idle_stack, idle_task, 128, 0);
+  create_task(idle_stack, idle_task, 128, 0, "Idling...\r\n");
 
   SHPR3 = (SHPR3 & ~(0xFFu << 16)) | (0xFFu << 16);
   curr_task = pick_next_task();
@@ -298,24 +303,94 @@ void start_scheduler(void) {
   __asm volatile ("svc 0");
 }
 
-void create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_size, uint8_t priority) {
+void create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_size, uint8_t priority, const char* name) {
   if(stack_size < 2 || !stack || !entry ||
     num_tasks >= MAX_TASKS || priority >= MAX_PRIO) {
     return;
+  }
+
+  for (uint32_t i = 0; i < stack_size; i++) {
+    stack[i] = STACK_FILL;
   }
 
   tcb_t* t = &tcbs[num_tasks++];
   t->sp = init_task(stack + stack_size, entry, task_return);
   t->priority = priority;
   t->state = TASK_READY;
+  t->stack_base = stack;
+  t->stack_size = stack_size;
+  t->name = name;
 
   insert_ready_task(t);
+}
+
+__attribute__((weak))
+void stack_overflow_hook(const tcb_t* t) {
+  uart_printf("Stack overflowed: Task %s, Priority: %u, Task @ %p\r\n", t->name, t->priority, t);
+  for(;;) {
+    __asm volatile ("nop");
+  }
+}
+
+__attribute__((used))
+static int stack_overflowed(const tcb_t* t) {
+#if SW_STACK_GUARD_MODE
+  /* MODE 1: is the sentinel band disturbed? */
+  for(uint32_t i = 0; i < SW_CANARY_WIDTH; i++) {
+    if(t->stack_base[i] != STACK_FILL) {
+      return 1;
+    }
+  }
+#endif
+
+#if SW_STACK_GUARD_MODE > 1
+  /* MODE 2 just check if the sp passde the stack_base */
+  if(t->sp < t->stack_base) {
+    return 1;
+  }
+#endif
+
+  return 0;
+}
+
+int task_free_words(const tcb_t* t) {
+  int free_words = 0;
+  for (uint32_t* p = t->stack_base; p < t->stack_base + t->stack_size; p++) {
+    if (*p == STACK_FILL) {
+      free_words++;
+    }
+    else {
+      break;
+    }
+  }
+  return free_words;
+}
+
+void task_hwm(const tcb_t* t) {
+  uart_printf("Task: %s, free stack: %d words\r\n", t->name, (unsigned)task_free_words(t));
+}
+
+void task_reporter() {
+  for (uint32_t i = 0; i  < num_tasks; i++) {
+#if STACK_GUARD
+    if(&tcbs[i] == curr_task) {
+      continue;
+    }
+#endif
+    task_hwm(&tcbs[i]);
+  }
 }
 
 void scheduler(void) {
   if(curr_task == NULL) {
     return;
   }
+
+#if !STACK_GUARD
+  if(stack_overflowed(curr_task)) {
+    stack_overflow_hook(curr_task);
+  }
+#endif
 
   if(curr_task->state == TASK_RUNNING) {
    curr_task->state = TASK_READY;
@@ -325,4 +400,8 @@ void scheduler(void) {
     return;
   }
   curr_task->state = TASK_RUNNING;
+
+#if STACK_GUARD
+  set_mpu_stack_guard(curr_task->stack_base);
+#endif
 }

@@ -22,3 +22,6 @@ _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
  * before it reaches SYSTICK.
  */
 #define SYSTICK_REF_HZ  100000u   /* 100KHz i.MX RT SysTick external ref: 24 MHz XTALOSC / 240 */
+
+#define STACK_GUARD 1
+#define SW_STACK_GUARD_MODE 2

@@ -15,6 +15,7 @@ void PendSV_Handler(void)    __attribute__((weak, alias("Default_Handler")));
 void SysTick_Handler(void)   __attribute__((weak, alias("Default_Handler")));
 void LPUART6_Handler(void)   __attribute__((weak, alias("Default_Handler")));
 void GPT1_Handler(void)      __attribute__((weak, alias("Default_Handler")));
+void MemManage_Handler(void) __attribute__((weak, alias("Default_Handler")));
 
 __attribute__((section(".isr_vector"), used))
 const void *vector_table[] = {
@@ -22,7 +23,8 @@ const void *vector_table[] = {
   Reset_Handler,          /* [1]  reset        */
   NMI_Handler,            /* [2]               */
   HardFault_Handler,      /* [3]               */
-  0, 0, 0, 0, 0, 0, 0,
+  MemManage_Handler,
+  0, 0, 0, 0, 0, 0,
   SVC_Handler,            /* [11] */
   0, 0,
   PendSV_Handler,         /* [14] */

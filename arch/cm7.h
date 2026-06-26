@@ -20,6 +20,7 @@
 #define SYST_CVR           (*(volatile uint32_t *)0xE000E018)
 
 #define SHPR3              (*(volatile uint32_t *)0xE000ED20)
+#define SHCSR              (*(volatile uint32_t *)0xE000ED24)
 
 #define SYST_CSR_ENABLE    (1u << 0)
 #define SYST_CSR_TICKINT   (1u << 1)
@@ -41,8 +42,8 @@
 /* BASEPRI operations for critical sections */
 static inline void arch_set_basepri(uint32_t v) {
   __asm volatile ("msr basepri, %0" :: "r"(v): "memory");
-  __asm volatile ("dsb");
-  __asm volatile ("isb");
+  __asm volatile ("dsb" ::: "memory");
+  __asm volatile ("isb" ::: "memory");
 }
 
 static inline uint32_t arch_get_basepri(void) {

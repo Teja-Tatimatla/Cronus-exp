@@ -10,18 +10,22 @@
 #include <cronus/tasks.h>
 #include <cronus/critical.h>
 #include <gpt.h>
+#include <mpu.h>
 
 #define STACK_SIZE 256
-uint32_t stack_a[STACK_SIZE]     __attribute__((aligned(8)));
-uint32_t stack_b[STACK_SIZE]     __attribute__((aligned(8)));
-uint32_t stack_c[STACK_SIZE]     __attribute__((aligned(8)));
+uint32_t stack_a[STACK_SIZE]      __attribute__((aligned(32)));
+uint32_t stack_b[STACK_SIZE]      __attribute__((aligned(32)));
+uint32_t stack_c[STACK_SIZE]      __attribute__((aligned(32)));
+uint32_t task_monitor[STACK_SIZE] __attribute__((aligned(32)));
 
+/*
 static void init_led(void) {
   CCM_CCGR0 |= (3u << 30);
   IOMUXC_MUX_B0_03 = 5;
   IOMUXC_PAD_B0_03 = 0x10B0;
   GPIO2_GDIR |= LED_PIN;
 }
+*/
 
 static void init_scope_pins(void) {
   /* Pin 14 */
@@ -57,8 +61,16 @@ static void task_a(void) {
   }
 }
 
+static void deep_recurse(int d) {
+  volatile uint32_t f[8];
+  f[0] = d;
+  if (d < 26) deep_recurse(d + 1);   /* overshoot the band by a controlled amount, then unwind */
+  (void)f[0];
+}
+
 static void task_b(void) {
   int n = 0;
+  deep_recurse(0);
 
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_16;
@@ -85,6 +97,15 @@ static void task_c(void) {
   }
 }
 
+static void monitor_task(void) {
+  while (1) {
+    enter_critical();
+    task_reporter();
+    exit_critical();
+    task_delay(1000);     /* report once a second */
+  }
+}
+
 int main(void) {
   switch_clock_600mhz();
   init_uart();
@@ -92,12 +113,14 @@ int main(void) {
   uart_printf("Cronus online\r\n");
   //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
 
-  create_task(stack_a, task_a, STACK_SIZE, 9);
-  create_task(stack_b, task_b, STACK_SIZE, 8);
-  create_task(stack_c, task_c, STACK_SIZE, 7);
+  create_task(stack_a, task_a, STACK_SIZE, 9, "Task A");
+  create_task(stack_b, task_b, STACK_SIZE, 8, "Task B");
+  create_task(stack_c, task_c, STACK_SIZE, 7, "Task C");
+  create_task(task_monitor, monitor_task, STACK_SIZE, 1, "monitor");
 
   init_sys_tick();
   gpt_init();
+  init_mpu();
   start_scheduler();
 
   while (1) {
