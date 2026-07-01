@@ -61,16 +61,8 @@ static void task_a(void) {
   }
 }
 
-static void deep_recurse(int d) {
-  volatile uint32_t f[8];
-  f[0] = d;
-  if (d < 26) deep_recurse(d + 1);   /* overshoot the band by a controlled amount, then unwind */
-  (void)f[0];
-}
-
 static void task_b(void) {
   int n = 0;
-  deep_recurse(0);
 
   while(1) {
     GPIO6_DR ^= SCOPE_PIN_16;
@@ -106,6 +98,37 @@ static void monitor_task(void) {
   }
 }
 
+// P1ex5 test start
+uint32_t __attribute__((aligned(32))) stack_worker    [STACK_SIZE];
+uint32_t __attribute__((aligned(32))) stack_oneshot   [STACK_SIZE];
+uint32_t __attribute__((aligned(32))) stack_controller[STACK_SIZE];
+uint32_t __attribute__((aligned(32))) stack_churn     [STACK_SIZE];
+static task_handle_t worker_handle;
+
+static void oneshot_task(void) {
+    uart_printf("oneshot: did my one job, dying now\r\n");
+    return;                                   /* auto-delete via init_task's LR landing pad */
+}
+static void worker_task(void) {
+    while (1) { GPIO6_DR ^= SCOPE_PIN_16; task_delay(50); }
+}
+static void controller_task(void) {
+    while (1) {
+        task_delay(500); suspend_task(worker_handle);
+        uart_printf("controller: worker parked\r\n");
+        task_delay(500); resume_task(worker_handle);
+        uart_printf("controller: worker resumed\r\n");
+    }
+}
+static void churn_task(void) {
+    for (uint32_t i = 0; i < 1000; i++) {
+        create_task(stack_oneshot, oneshot_task, STACK_SIZE, 6, "spawn");
+        task_delay(10);
+    }
+    uart_printf("churn: 1000 spawns, never hit MAX_TASKS\r\n");
+}
+// P1ex5 test end
+
 int main(void) {
   switch_clock_600mhz();
   init_uart();
@@ -113,10 +136,16 @@ int main(void) {
   uart_printf("Cronus online\r\n");
   //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
 
+  /*
   create_task(stack_a, task_a, STACK_SIZE, 9, "Task A");
   create_task(stack_b, task_b, STACK_SIZE, 8, "Task B");
   create_task(stack_c, task_c, STACK_SIZE, 7, "Task C");
   create_task(task_monitor, monitor_task, STACK_SIZE, 1, "monitor");
+  */
+
+  worker_handle = create_task(stack_worker, worker_task, STACK_SIZE, 8, "worker");
+  create_task(stack_controller, controller_task, STACK_SIZE, 7, "controller");
+  create_task(stack_churn, churn_task,      STACK_SIZE, 5, "churn");
 
   init_sys_tick();
   gpt_init();
