@@ -9,19 +9,24 @@ SVC_Handler:
   ldr   r0, =curr_task
   ldr   r0, [r0]
   ldr   r0, [r0]
-  ldmia r0!, {r4-r11}
+  ldmia r0!, {r4-r11, lr}
+  tst   lr, #0x10
+  it    eq
+  vldmiaeq r0!, {s16-s31}
   msr   psp, r0
   movs  r1, #2
   msr   control, r1
   isb
-  ldr   lr, =0xFFFFFFFD
   bx lr
 
   .global PendSV_Handler
   .thumb_func
 PendSV_Handler:
   mrs   r0, psp
-  stmdb r0!, {r4-r11}
+  tst   lr, 0x10
+  it    eq
+  vstmdbeq  r0!, {s16-s31}
+  stmdb r0!, {r4-r11, lr}
 
   ldr   r1, =curr_task
   ldr   r2, [r1]
@@ -33,6 +38,9 @@ PendSV_Handler:
 
   ldr   r2, [r1]
   ldr   r0, [r2]
-  ldmia r0!, {r4-r11}
+  ldmia r0!, {r4-r11, lr}
+  tst   lr, 0x10
+  it    eq
+  vldmiaeq r0!, {s16-s31}
   msr   psp, r0
   bx lr

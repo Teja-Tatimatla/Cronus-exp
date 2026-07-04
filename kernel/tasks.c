@@ -34,7 +34,6 @@ static uint32_t idle_stack[128] __attribute__((aligned(32)));
 static void unlink_task_from_list(tcb_t* t);
 
 static volatile uint32_t scheduler_suspended = 0;
-static volatile uint32_t pended_ticks = 0;
 
 static inline task_handle_t make_handle(uint16_t gen, uint32_t idx) {
   return ((task_handle_t)gen << HANDLE_IDX_BITS) | (idx & HANDLE_IDX_MASK);
@@ -371,9 +370,9 @@ void task_delay_until(uint32_t* last_wake, uint32_t ms) {
   uint32_t wake = *last_wake + ms;
   *last_wake = wake;
   if((int32_t)(wake - now) > 0) {
+    unlink_task_from_list(curr_task);
     curr_task->wake = wake;
     curr_task->state = TASK_SLEEP;
-    unlink_task_from_list(curr_task);
     insert_delayed_task(curr_task, now);
     exit_critical();
     yield();
@@ -445,6 +444,7 @@ int resume_task_isr(task_handle_t h) {
     }
 
     t->state = TASK_READY;
+    t->resume_resleep = 0;
     insert_ready_task(t);
     if(t->priority > curr_task->priority) {
       yield = 1;
@@ -457,7 +457,6 @@ void kernel_tick(uint32_t now) {
   static uint32_t last_now = 0;
 
   if(scheduler_suspended) {
-    pended_ticks++;
     return;
   }
 
@@ -593,16 +592,15 @@ void task_reporter() {
 }
 
 void suspend_all_tasks(void) {
-  scheduler_suspended++;
+  enter_critical();
+    scheduler_suspended++;
+  exit_critical();
 }
 
 void resume_all_tasks(void) {
   enter_critical();
-    if (--scheduler_suspended == 0) {
-      while(pended_ticks) {
-        kernel_tick(get_tick_count());
-        pended_ticks--;
-      }
+    if (scheduler_suspended > 0 && --scheduler_suspended == 0) {
+      kernel_tick(get_tick_count());
     }
   exit_critical();
   yield();

@@ -11,9 +11,10 @@ static volatile uint8_t rx_buff[RXBUF_SIZE];
 static volatile uint32_t rx_head = 0;
 static volatile uint32_t rx_tail = 0;
 
-
 static void uart_printf_int(int v);
 static void uart_printf_uint(unsigned int v, unsigned int base, int upper);
+static void uart_printf_double(double v, unsigned int precision);
+
 
 void init_uart(void) {
   /* CMM_CSCDR1[UART_CLK_PODF] is [5:0] 000000 is dividied by 1
@@ -84,6 +85,11 @@ void uart_printf(const char* fmt_str, ...) {
         uart_printf_uint(va_arg(ap, unsigned), 10, 0);
         break;
 
+      case 'f':
+      case 'F':
+        uart_printf_double(va_arg(ap, double), 6);
+        break;
+
       case 'x':
         uart_printf_uint(va_arg(ap, unsigned), 16, 0);
         break;
@@ -99,15 +105,16 @@ void uart_printf(const char* fmt_str, ...) {
         break;
 
       case 'c':
-        uart_printf_uint((char)va_arg(ap, int), 10, 0);
+        uart_putc((char)va_arg(ap, int));
         break;
 
-      case 's':
+      case 's': {
         const unsigned char* s = va_arg(ap, unsigned char *);
         while(*s) {
           uart_putc(*s++);
         }
         break;
+      }
 
       case '%':
         uart_putc('%');
@@ -170,6 +177,69 @@ static void uart_printf_uint(unsigned int v, unsigned int base, int upper) {
 
   while(i) {
     uart_putc(buff[--i]);
+  }
+}
+
+static void uart_printf_double(double v, unsigned int precision) {
+  /* varargs promote float->double, so this is always handed a double (see the call site). */
+  if(__builtin_isnan(v)) {    /* prints unsigned, like glibc */
+    uart_putc('n');
+    uart_putc('a');
+    uart_putc('n');
+    return;
+  }
+
+  if(__builtin_signbit(v)) {  /* correct for -inf and -0.0 too */
+    uart_putc('-');
+    v = -v;
+  }
+
+  if(__builtin_isinf(v)) {
+    uart_putc('i');
+    uart_putc('n');
+    uart_putc('f');
+    return;
+  }
+
+  /* split into integer and fractional parts */
+  uint32_t ipart = (uint32_t)v;     /* NOTE: integer part must fit in 32 bits */
+  double frac = v - (double)ipart;
+
+  /* scale the fraction to an integer, round-to-nearest */
+  uint32_t scale = 1u;
+  for (unsigned int i = 0; i < precision; i++) {    /* precision <= 9 for u32 */
+    scale *= 10u;
+  }
+
+  uint32_t fpart =  (uint32_t)(frac * (double)scale + 0.5);
+
+  /* rounding can carry into the integer part: 1.9999996 -> "2.000000" */
+  if(fpart >= scale) {
+    fpart -= scale;
+    ipart += 1u;
+  }
+
+  /* reuse your integer path */
+  uart_printf_uint(ipart, 10, 0);
+
+  if(precision > 0) {
+    uart_putc('.');
+    /* print fpart as exactly `precision` digits, zero-padded on the left */
+    char buff[16];
+    int i = 0;
+    uint32_t f = fpart;
+    do {
+      buff[i++] = (char)('0' + (int)(f % 10u));
+      f /= 10u;
+    } while (f);
+
+    while(i < (int)precision) {
+      buff[i++] = '0';
+    }
+
+    while(i) {
+      uart_putc(buff[--i]);
+    }
   }
 }
 

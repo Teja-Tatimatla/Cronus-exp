@@ -12,6 +12,7 @@ add_executable(cronus.elf
   arch/port.c
   arch/fault.c
   arch/mpu.c
+  arch/fpu.c
   kernel/tasks.c
   kernel/critical.c
   bsp/boot.c

@@ -11,6 +11,10 @@ uint32_t* init_task(uint32_t* stack_top, void (*entry)(void), void (*task_return
   *(--sp) = 0;  // r1
   *(--sp) = 0;  // r0
 
+  /*  per-task EXC_RETURN. bit4=1 => standard (integer) frame — a fresh task has no FP
+    * state yet. The hardware promotes it to FP-active on its first FP instruction. */
+  *(--sp) = 0xFFFFFFFDu;
+
   for(int i = 0; i < 8; i++) {
     *(--sp) = 0;
   }
