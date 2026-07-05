@@ -12,6 +12,7 @@
 #include <gpt.h>
 #include <mpu.h>
 #include <fpu.h>
+#include <cronus/sem.h>
 
 #define STACK_SIZE 256
 uint32_t stack_a[STACK_SIZE]      __attribute__((aligned(32)));
@@ -48,6 +49,7 @@ static void init_scope_pins(void) {
   GPIO6_GDIR |= SCOPE_PIN_17;
 }
 
+/*
 static void task_a(void) {
   int n = 0;
   float f = 0.1;
@@ -102,7 +104,37 @@ static void monitor_task(void) {
     enter_critical();
     task_reporter();
     exit_critical();
-    task_delay(1000);     /* report once a second */
+    task_delay(1000);     // report once a second
+  }
+}
+*/
+
+static semaphore_t sem;
+
+uint32_t stack_prod[STACK_SIZE]      __attribute__((aligned(32)));
+uint32_t stack_cons[STACK_SIZE]      __attribute__((aligned(32)));
+uint32_t stack_probe[STACK_SIZE]     __attribute__((aligned(32)));
+
+static void producer(void) {
+  while(1) {
+    task_delay(300);
+    sem_give(&sem);
+  }
+}
+
+static void consumer(void) {
+  for(;;) {
+    int got = sem_take(&sem, SEM_WAIT_FOREVER);
+    GPIO6_DR ^= SCOPE_PIN_16;
+
+    uart_printf("consumer woke (got=%d)\r\n", got);
+  }
+}
+
+static void timeout_probe(void) {
+  for(;;) {
+    int got = sem_take(&sem, 100);
+    uart_printf("probe %s\r\n", got ? "signalled" : "timed out");
   }
 }
 
@@ -114,10 +146,18 @@ int main(void) {
   uart_printf("Cronus online\r\n");
   //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
 
+  /*
   create_task(stack_a, task_a, STACK_SIZE, 9, "Task A");
   create_task(stack_b, task_b, STACK_SIZE, 8, "Task B");
   create_task(stack_c, task_c, STACK_SIZE, 7, "Task C");
   create_task(task_monitor, monitor_task, STACK_SIZE, 1, "monitor");
+  */
+
+  sem_init(&sem, 0, 10);
+
+  create_task(stack_prod,  producer,      STACK_SIZE, 5, "prod");
+  create_task(stack_cons,  consumer,      STACK_SIZE, 8, "cons");
+  create_task(stack_probe, timeout_probe, STACK_SIZE, 4, "probe");
 
   init_sys_tick();
   gpt_init();

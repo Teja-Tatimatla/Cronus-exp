@@ -15,6 +15,7 @@ add_executable(cronus.elf
   arch/fpu.c
   kernel/tasks.c
   kernel/critical.c
+  kernel/sem.c
   bsp/boot.c
   bsp/clock.c
   bsp/gpt.c

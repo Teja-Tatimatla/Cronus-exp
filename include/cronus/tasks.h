@@ -26,6 +26,10 @@ typedef struct tcb {
   uint8_t      resume_resleep;
   struct tcb*  next;
   struct tcb*  prev;
+  struct tcb*  ev_next;
+  struct tcb*  ev_prev;
+  struct tcb** wait_head;
+  int          wait_result;
 } tcb_t;
 
 
@@ -36,6 +40,10 @@ void task_delay(uint32_t ms);
 void task_delay_until(uint32_t* last_wake, uint32_t ms);
 void task_reporter();
 void yield(void);
+
+void unlink_task_from_list(tcb_t* t);
+void insert_delayed_task(tcb_t* t, uint32_t now);
+void insert_ready_task(tcb_t* t);
 
 task_handle_t get_task_handle(void);
 void suspend_task(task_handle_t h);

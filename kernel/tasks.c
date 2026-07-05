@@ -9,6 +9,7 @@
 #include <cronus/config.h>
 #include <uart.h>
 #include <mpu.h>
+#include <cronus/sem.h>
 
 #define MAX_TASKS 8
 #define MAX_PRIO  32
@@ -31,7 +32,7 @@ static tcb_t* delayed_list = NULL;
 static tcb_t* delayed_list_overflow = NULL;
 
 static uint32_t idle_stack[128] __attribute__((aligned(32)));
-static void unlink_task_from_list(tcb_t* t);
+void unlink_task_from_list(tcb_t* t);
 
 static volatile uint32_t scheduler_suspended = 0;
 
@@ -221,7 +222,7 @@ void idle_task() {
   }
 }
 
-static void insert_ready_task(tcb_t* t) {
+void insert_ready_task(tcb_t* t) {
   if(t == NULL) {
     return;
   }
@@ -284,13 +285,37 @@ static void remove_delayed_task(tcb_t* t) {
   }
 }
 
-static void unlink_task_from_list(tcb_t* t) {
+void wait_abort(tcb_t* t) {
+  if(t == NULL || t->wait_head == NULL) {
+    return;
+  }
+
+  if(t->ev_prev) {
+    t->ev_prev->ev_next = t->ev_next;
+  } else {
+    *t->wait_head = t->ev_next;
+  }
+
+  if(t->ev_next) {
+    t->ev_next->ev_prev = t->ev_prev;
+  }
+
+  t->ev_next = t->ev_prev = NULL;
+  t->wait_head = NULL;
+  t->wait_result = 0;
+}
+
+void unlink_task_from_list(tcb_t* t) {
   switch (t->state) {
     case TASK_RUNNING:
     case TASK_READY:
       remove_ready_task(t);
       break;
 
+    case TASK_BLOCKED:
+      wait_abort(t);
+      remove_delayed_task(t);
+      break;
     case TASK_SLEEP:
       remove_delayed_task(t);
       break;
@@ -329,7 +354,7 @@ static void insert_delayed_into(tcb_t** list, tcb_t* t) {
   curr->next = t;
 }
 
-static void insert_delayed_task(tcb_t* t, uint32_t now) {
+void insert_delayed_task(tcb_t* t, uint32_t now) {
   if(t->wake < now) {
     insert_delayed_into(&delayed_list_overflow, t);
   } else {
@@ -465,6 +490,11 @@ void kernel_tick(uint32_t now) {
       tcb_t* t = delayed_list;
       delayed_list = t->next;
       t->next = t->prev = NULL;
+
+      if(t->state == TASK_BLOCKED && t->wait_head != NULL) {
+        wait_abort(t);
+      }
+
       t->state = TASK_READY;
       insert_ready_task(t);
     }
@@ -477,6 +507,11 @@ void kernel_tick(uint32_t now) {
     tcb_t* t = delayed_list;
     delayed_list = t->next;
     t->next = t->prev = NULL;
+
+    if(t->state == TASK_BLOCKED && t->wait_head != NULL) {
+      wait_abort(t);
+    }
+
     t->state = TASK_READY;
     insert_ready_task(t);
   }
