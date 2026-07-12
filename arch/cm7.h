@@ -30,6 +30,13 @@
 /* NVIC Interrupt Set-Enabled Registers */
 #define NVIC_ISER(n)       (*(volatile uint32_t *)(0xE000E100 + 4u*(n)))
 
+/* Interrupt Priority Register
+ * Byte Form no 4u*(n)
+ * So to set priority for interrupt with IRQ 100
+ * You can do NVIC_IPR(100) = priority
+ */
+#define NVIC_IPR(n)        (*(volatile uint8_t  *)(0xE000E400 + (n)))
+
 /* GPC IRQ Masking Registers */
 #define GPC_IMR(n)         (*(volatile uint32_t *)(0x400F4008 + 4u*(n)))
 

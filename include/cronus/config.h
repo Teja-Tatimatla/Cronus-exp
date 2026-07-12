@@ -25,3 +25,5 @@ _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
 
 #define STACK_GUARD 1
 #define SW_STACK_GUARD_MODE 2
+
+#define CONFIG_NOTIFY_SLOTS 5

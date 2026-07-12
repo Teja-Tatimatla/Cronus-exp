@@ -13,4 +13,9 @@ typedef struct semaphore {
 
 void sem_init(semaphore_t* s, int32_t initial, int32_t max_count);
 void sem_give(semaphore_t* s);
+int sem_give_from_isr(semaphore_t* s);
 int sem_take(semaphore_t* s, uint32_t timeout_ms);
+
+static inline void sem_init_binary(semaphore_t* s, int32_t initial) {
+  sem_init(s, initial, 1);
+}

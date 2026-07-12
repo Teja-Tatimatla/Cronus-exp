@@ -37,24 +37,6 @@ static void wait_insert(semaphore_t* s, tcb_t* t) {
   ct->ev_next = t;
 }
 
-static void wait_remove(semaphore_t* s, tcb_t* t) {
-  if(s == NULL || t == NULL) {
-    return;
-  }
-
-  if (t->ev_prev) {
-    t->ev_prev->ev_next = t->ev_next;
-  } else {
-    s->wait_list = t->ev_next;
-  }
-
-  if(t->ev_next) {
-    t->ev_next->ev_prev = t->ev_prev;
-  }
-
-  t->ev_next = t->ev_prev = NULL;
-}
-
 static tcb_t* wait_pop_highest(semaphore_t* s) {
   if(s == NULL) {
     return NULL;

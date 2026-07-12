@@ -21,14 +21,15 @@ gpt_init(void) {
   /* 3. NVIC enable (so the handler runs after wake). */
   NVIC_ISER(GPT1_IRQ / 32u) = (1u << (GPT1_IRQ % 32u));
 
-  /* 4. Unmask GPT1 in the GPC so it can WAKE the core from WAIT. This is the
+  /* 4. Set Interrupt Priority
+   * Priority 0x80 >= MAX_SYSCALL_PRIO (0x20), so BASEPRI critical sections mask it.
+   */
+  NVIC_IPR(GPT1_IRQ) = 0x80u;
+
+  /* 5. Unmask GPT1 in the GPC so it can WAKE the core from WAIT. This is the
        thing SysTick can't do. IRQ 100 -> IMR[100/32]=IMR4, bit 100%32=4, clear-to-enable
        (verified against NXP fsl_gpc.c with FSL_FEATURE_GPC_HAS_IRQ_0_31=1). */
   GPC_IMR(GPT1_IRQ / 32u) &= ~(1u << (GPT1_IRQ % 32u));
-
-  /* 5. Guarantee idle's WFI enters WAIT (osc stays on -> GPT keeps ticking),
-       not STOP. LPM=01 is the boot default; set explicitly for intent. */
-  CCM_CLPCR = (CCM_CLPCR & ~0x3u) | 0x1u;
 }
 
 void

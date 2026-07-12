@@ -19,6 +19,7 @@ add_executable(cronus.elf
   bsp/boot.c
   bsp/clock.c
   bsp/gpt.c
+  bsp/lpm.c
   app/main.c
   drivers/uart.c
 )

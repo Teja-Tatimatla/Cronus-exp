@@ -1,15 +1,17 @@
-#include "gpt.h"
+#include <gpt.h>
 #include <cm7.h>
 #include <cronus/tasks.h>
 
 #include <stdint.h>
 #include <sys/reent.h>
 #include <cronus/critical.h>
+#include <sys/types.h>
 #include <systick.h>
 #include <cronus/config.h>
 #include <uart.h>
 #include <mpu.h>
 #include <cronus/sem.h>
+#include <lpm.h>
 
 #define MAX_TASKS 8
 #define MAX_PRIO  32
@@ -133,8 +135,10 @@ static void tickless_sleep(uint32_t idle_ticks) {
   SYST_CSR = 0;             /* stop 1 ms tick; GPT keeps time */
 
   gpt_start(interval);
+  lpm_wait_config();
   __asm volatile ("dsb" ::: "memory");
   __asm volatile ("wfi" ::: "memory");
+  lpm_run_config();
 
   uint32_t elapsed = gpt_stop_return_elapsed();
   uint32_t slept_ticks = elapsed / per_tick;
@@ -547,6 +551,17 @@ task_handle_t create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_s
 
     t->generation++;
 
+    t->resume_resleep = 0;
+    t->wake = 0;
+    t->wait_result = 0;
+    t->wait_head = NULL;
+    t->ev_next = t->ev_prev = NULL;
+
+    for (uint32_t s = 0; s < CONFIG_NOTIFY_SLOTS; s++) {
+      t->notify_value[s] = 0;
+      t->notify_state[s] = NOTIFY_IDLE;
+    }
+
     for (uint32_t i = 0; i < stack_size; i++) {
       stack[i] = STACK_FILL;
     }
@@ -606,8 +621,44 @@ int task_free_words(const tcb_t* t) {
   return free_words;
 }
 
+static const char* task_state_as_str(const tcb_t* t) {
+  switch (t->state) {
+    case TASK_RUNNING:
+      return "running";
+
+    case TASK_READY:
+      return "ready";
+
+    case TASK_SLEEP:
+      return "sleeping";
+
+    case TASK_SUSPEND:
+      return "suspended";
+
+    case TASK_DEAD:
+      return "dead";
+
+    case TASK_BLOCKED:
+      if(t->wait_head != NULL) {
+        return "blocked";
+      }
+
+      for(uint32_t s = 0; s < CONFIG_NOTIFY_SLOTS; s++) {
+        if(t->notify_state[s] == NOTIFY_WAITING) {
+          return "blocked:notify";
+        }
+      }
+      break;
+
+    default:
+      return "???";
+  }
+
+  return "???";
+}
+
 void task_hwm(const tcb_t* t) {
-  uart_printf("Task: %s, free stack: %d words\r\n", t->name, (unsigned)task_free_words(t));
+  uart_printf("Task: %s, free stack: %d words, task state: %s\r\n", t->name, (unsigned)task_free_words(t), task_state_as_str(t));
 }
 
 void task_reporter() {
@@ -641,6 +692,180 @@ void resume_all_tasks(void) {
   yield();
   return;
 }
+
+// task notifications - start
+uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit) {
+  if(slot > CONFIG_NOTIFY_SLOTS) {
+    return 0;
+  }
+
+  enter_critical();
+    if(curr_task->notify_value[slot] == 0) {
+      if(time_out == 0) {
+        exit_critical();
+        return 0;
+      }
+
+      curr_task->notify_state[slot] = NOTIFY_WAITING;
+      unlink_task_from_list(curr_task);
+
+      curr_task->state = TASK_BLOCKED;
+
+      if(time_out != TASK_WAIT_FOREVER) {
+        uint32_t now = get_tick_count();
+        curr_task->wake = now + time_out;
+        insert_delayed_task(curr_task, now);
+      }
+
+      exit_critical();
+      yield();
+      enter_critical();
+    }
+
+    uint32_t value = curr_task->notify_value[slot];
+    if(value > 0) {
+      curr_task->notify_value[slot] = clear_on_exit ? 0u : value - 1u;
+    }
+    curr_task->notify_state[slot] = NOTIFY_IDLE;
+
+  exit_critical();
+  return value;
+}
+
+uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exit, uint32_t* out, uint32_t time_out) {
+  if(slot > CONFIG_NOTIFY_SLOTS) {
+    return 0;
+  }
+
+  enter_critical();
+    if(curr_task->notify_state[slot] != NOTIFY_PENDING) {
+      curr_task->notify_value[slot] &= ~clear_on_entry;
+
+      if(time_out == 0) {
+        exit_critical();
+        return 0;
+      }
+
+      unlink_task_from_list(curr_task);
+      curr_task->notify_state[slot] = NOTIFY_WAITING;
+
+      curr_task->state = TASK_BLOCKED;
+
+      if(time_out != TASK_WAIT_FOREVER) {
+        uint32_t now = get_tick_count();
+        curr_task->wake = now + time_out;
+        insert_delayed_task(curr_task, now);
+      }
+
+      exit_critical();
+      yield();
+      enter_critical();
+    }
+
+    int got = (curr_task->notify_state[slot] == NOTIFY_PENDING);
+    if(out) {
+      *out = curr_task->notify_value[slot];
+    }
+
+    if(got) {
+      curr_task->notify_value[slot] &= ~clear_on_exit;
+    }
+    curr_task->notify_state[slot] = NOTIFY_IDLE;
+
+  exit_critical();
+  return got;
+}
+
+static int notify_wake_if_blocked(tcb_t* t, uint32_t slot) {
+  if(t->notify_state[slot] == NOTIFY_WAITING && t->state == TASK_BLOCKED) {
+    unlink_task_from_list(t);
+    t->state = TASK_READY;
+    insert_ready_task(t);
+
+    return (t->priority > curr_task->priority);
+  }
+
+  return 0;
+}
+
+static int notify_apply(tcb_t* t, uint32_t slot, uint32_t value, notify_action_e action, int* preempt) {
+  int delivered = 1;
+  switch (action) {
+    case NOTIFY_SET_BITS:
+      t->notify_value[slot] |= value;
+      break;
+
+    case NOTIFY_INCREMENT:
+      t->notify_value[slot]++;
+      break;
+
+    case NOTIFY_SET_VALUE_OVERWRITE:
+      t->notify_value[slot] = value;
+      break;
+
+    case NOTIFY_SET_VALUE_NO_OVERWRITE:
+      if(t->notify_state[slot] == NOTIFY_PENDING) {
+        delivered = 0;
+      } else {
+        t->notify_value[slot] = value;
+      }
+      break;
+
+    case NOTIFY_NO_ACTION:
+    default:
+      break;
+  }
+
+  if(delivered) {
+    *preempt = notify_wake_if_blocked(t, slot);
+    t->notify_state[slot] = NOTIFY_PENDING;
+  }
+
+  return delivered;
+}
+
+int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
+  if(slot > CONFIG_NOTIFY_SLOTS) {
+    return -1;
+  }
+
+  enter_critical();
+    tcb_t* t = resolve_task_handle(h);
+    if(t == NULL) {
+      exit_critical();
+      return -1;
+    }
+
+    int preempt = 0;
+    int delivered = notify_apply(t, slot, value, action, &preempt);
+
+  exit_critical();
+  if(preempt) {
+    yield();
+  }
+
+  return delivered;
+}
+
+uint32_t notify_indexed_from_isr(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
+  if(slot > CONFIG_NOTIFY_SLOTS) {
+    return 0;
+  }
+
+  uint32_t bpr = enter_critical_isr();
+    tcb_t* t = resolve_task_handle(h);
+    if(t == NULL) {
+      exit_critical_isr(bpr);
+      return 0;
+    }
+
+    int preempt = 0;
+    (void)notify_apply(t, slot, value, action, &preempt);
+
+  exit_critical_isr(bpr);
+  return preempt;
+}
+// task notifications - end
 
 void scheduler(void) {
   if(scheduler_suspended) {
@@ -681,5 +906,7 @@ void start_scheduler(void) {
     return;
   }
   curr_task->state = TASK_RUNNING;
+
+  init_sys_tick();
   __asm volatile ("svc 0");
 }
