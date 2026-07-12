@@ -12,7 +12,7 @@ _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
 
 #define CONFIG_USE_IDLE_HOOK 1
 #define CONFIG_USE_TICKLESS_IDLE 1
-#define TICKLESS_THRESHOLD 5u
+#define TICKLESS_THRESHOLD 50u
 
 /*
  * Tsis is from

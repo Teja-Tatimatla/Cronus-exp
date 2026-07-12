@@ -84,6 +84,20 @@ static inline uint32_t notify_take(uint32_t time_out, int clear_on_exit) {
   return notify_take_indexed(0, time_out, clear_on_exit);
 }
 
+/* give = INCREMENT with no payload: the count-flavor sender, pairs with
+ * notify_take. Wake handled inside notify_apply; value arg unused.        */
+static inline int notify_give_indexed(task_handle_t h, uint32_t slot) {
+  return notify_indexed(h, slot, 0, NOTIFY_INCREMENT);
+}
+
+static inline int notify_give(task_handle_t h) {
+  return notify_give_indexed(h, 0);
+}
+
+static inline uint32_t notify_give_from_isr(task_handle_t h) {
+  return notify_indexed_from_isr(h, 0, 0, NOTIFY_INCREMENT);
+}
+
 static inline uint32_t notify_wait(int clear_on_entry, int clear_on_exit, uint32_t* out, uint32_t time_out) {
   return notify_wait_indexed(0, clear_on_entry, clear_on_exit, out, time_out);
 }

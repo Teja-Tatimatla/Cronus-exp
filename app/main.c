@@ -3,10 +3,7 @@
 #include <imxrt1062.h>
 #include <board.h>
 #include <clock.h>
-#include <dwt.h>
-#include <systick.h>
 #include <uart.h>
-#include <context.h>
 #include <cronus/tasks.h>
 #include <cronus/critical.h>
 #include <gpt.h>
@@ -14,22 +11,11 @@
 #include <fpu.h>
 #include <cronus/sem.h>
 #include <lpm.h>
-#include <cm7.h>
 
 #define STACK_SIZE 256
 uint32_t stack_a[STACK_SIZE]      __attribute__((aligned(32)));
 uint32_t stack_b[STACK_SIZE]      __attribute__((aligned(32)));
-uint32_t stack_c[STACK_SIZE]      __attribute__((aligned(32)));
 uint32_t task_monitor[STACK_SIZE] __attribute__((aligned(32)));
-
-/*
-static void init_led(void) {
-  CCM_CCGR0 |= (3u << 30);
-  IOMUXC_MUX_B0_03 = 5;
-  IOMUXC_PAD_B0_03 = 0x10B0;
-  GPIO2_GDIR |= LED_PIN;
-}
-*/
 
 static void init_scope_pins(void) {
   /* Pin 14 */
@@ -51,56 +37,6 @@ static void init_scope_pins(void) {
   GPIO6_GDIR |= SCOPE_PIN_17;
 }
 
-/*
-static void task_a(void) {
-  int n = 0;
-  float f = 0.1;
-
-  uint32_t last_wake = get_tick_count();
-  while(1) {
-    enter_critical();
-    GPIO6_DR ^= SCOPE_PIN_14;
-    n++;
-    f += 0.1;
-    uart_printf("A:%d - %f\r\n", n, f);
-    GPIO6_DR ^= SCOPE_PIN_14;
-    exit_critical();
-    task_delay_until(&last_wake, 200);
-  }
-}
-
-static void task_b(void) {
-  int n = 0;
-  float f = 0.001;
-
-  while(1) {
-    enter_critical();
-    GPIO6_DR ^= SCOPE_PIN_16;
-    n++;
-    f += 0.001;
-    uart_printf("B:%d - %f\r\n", n, f);
-    GPIO6_DR ^= SCOPE_PIN_16;
-    exit_critical();
-    task_delay(100);
-  }
-}
-
-static void task_c(void) {
-  int n = 0;
-  float f = 0.00001;
-
-  while(1) {
-    enter_critical();
-    GPIO6_DR ^= SCOPE_PIN_17;
-    n++;
-    f += 0.00001;
-    uart_printf("C:%d - %f\r\n", n, f);
-    GPIO6_DR ^= SCOPE_PIN_17;
-    exit_critical();
-    task_delay(50);
-  }
-}
-*/
 
 static void monitor_task(void) {
   while (1) {
@@ -111,11 +47,11 @@ static void monitor_task(void) {
   }
 }
 
-#define TEST 1
+#define TEST 3
 
 #define BINARY 1
 
-#if TEST == 1
+#if TEST == 2
 
 static semaphore_t sem;
 static volatile uint32_t fifo_depth = 0;
@@ -145,10 +81,6 @@ static void consumer(void) {
   }
 }
 
-static void hb(void) {
-  for(;;) { GPIO6_DR ^= SCOPE_PIN_17; task_delay(100); }
-}
-
 #elif TEST == 2
 
 static task_handle_t h_worker;
@@ -163,7 +95,7 @@ static void notifier(void) {
 
 static void worker(void) {
   for(;;) {
-    notify_take(1, WAIT_FOREVER);
+    notify_take(1, TASK_WAIT_FOREVER);
     GPIO6_DR ^= SCOPE_PIN_16;
     uart_printf("worker: woke on notification\r\n");
   }
@@ -187,7 +119,7 @@ static void writer(void) {
 static void reader(void) {
   for(;;) {
     uint32_t v = 0;
-    notify_wait(0, 0, &v, WAIT_FOREVER);
+    notify_wait(0, 0, &v, TASK_WAIT_FOREVER);
     GPIO6_DR ^= SCOPE_PIN_16;
     uart_printf("reader: got %u\r\n", v);
   }
@@ -195,22 +127,12 @@ static void reader(void) {
 
 #endif /* TEST */
 
-#define GPC_ISR(n) (*(volatile uint32_t *)(0x400F4018u + 4u*(n)))   /* verified: 0x18 */
-
 int main(void) {
   switch_clock_600mhz();
   init_fpu();
   init_uart();
   init_scope_pins();
   uart_printf("Cronus online\r\n");
-  //uart_printf("dec=%d hex=%X neg=%d char=%c str=%s pct=%%\r\n", 42, 0xABCD, -7, 'Q', "hello");
-
-  /*
-  create_task(stack_a, task_a, STACK_SIZE, 9, "Task A");
-  create_task(stack_b, task_b, STACK_SIZE, 8, "Task B");
-  create_task(stack_c, task_c, STACK_SIZE, 7, "Task C");
-  create_task(task_monitor, monitor_task, STACK_SIZE, 1, "monitor");
-  */
 
   #if TEST == 1
     #if BINARY
@@ -222,7 +144,6 @@ int main(void) {
     #endif
     create_task(stack_a, producer, STACK_SIZE, 6, "prod");
     create_task(stack_b, consumer, STACK_SIZE, 5, "cons");
-    //create_task(stack_c, hb, STACK_SIZE, 7, "hb");
 
   #elif TEST == 2
     h_worker = create_task(stack_b, worker,   STACK_SIZE, 7, "work");
@@ -237,12 +158,6 @@ int main(void) {
 
   gpt_init();
   lpm_init();
-
-  uart_printf("CGPR=%X\r\n", (unsigned)CCM_CGPR);
-  uart_printf("IMR: %X %X %X %X\r\n", (unsigned)GPC_IMR(0), (unsigned)GPC_IMR(1),
-                                      (unsigned)GPC_IMR(2), (unsigned)GPC_IMR(3));
-  uart_printf("ISR: %X %X %X %X\r\n", (unsigned)GPC_ISR(0), (unsigned)GPC_ISR(1),
-                                      (unsigned)GPC_ISR(2), (unsigned)GPC_ISR(3));
 
   init_mpu();
   start_scheduler();

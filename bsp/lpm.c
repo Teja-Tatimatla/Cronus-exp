@@ -2,6 +2,7 @@
 #include <imxrt1062.h>
 #include <cm7.h>                       /* GPC_IMR(n) */
 #include <lpm.h>
+#include <gpt.h>
 
 /* True WAIT-mode entry for tickless idle - hardware-verified July 2026.
  * Three pieces, all mandatory; each was independently fatal when missing:
@@ -38,18 +39,32 @@ void lpm_init(void) {
    * TCM clocks is a hard hang. (NXP lpm.c LPM_Init, line 161; CGPR[17].)   */
   CCM_CGPR |= CCM_CGPR_INT_MEM_CLK_LPM;
 
+  /* Wake-source whitelist (NXP discipline): mask everything, then unmask
+   * exactly the registered wake sources. Currently: GPT1 only.
+  */
+  GPC_IMR(0) = 0xFFFFFFFFu;                          /* mask ALL GPC wake sources   */
+  GPC_IMR(1) = 0xFFFFFFFFu;
+  GPC_IMR(2) = 0xFFFFFFFFu;
+  GPC_IMR(3) = 0xFFFFFFFFu;
+  GPC_IMR(GPT1_IRQ / 32u) &= ~(1u << (GPT1_IRQ % 32u));   /* GPT1 back in — the wake */
+
   IOMUXC_GPR_GPR1 |= IOMUXC_GPR_GPR1_GINT;              /* ERR050143 step 1 */
-  GPC_IMR(GPR_IRQ / 32u) |= (1u << (GPR_IRQ % 32u));    /* parked masked    */
 }
 
 void lpm_wait_config(void) {
-  GPC_IMR(GPR_IRQ / 32u) &= ~(1u << (GPR_IRQ % 32u));  /* step 2: unmask   */
+  GPC_IMR(GPR_IRQ / 32u) &= ~(1u << (GPR_IRQ % 32u));
   uint32_t clpcr = CCM_CLPCR & ~(CLPCR_LPM_MASK | CLPCR_ARM_CLK_DIS_ON_LPM);
   CCM_CLPCR = clpcr | CLPCR_LPM_WAIT
             | CLPCR_MASK_SCU_IDLE | CLPCR_MASK_L2CC_IDLE
-            | CLPCR_ARM_CLK_DIS_ON_LPM | CLPCR_STBY_COUNT_MASK
+            | CLPCR_STBY_COUNT_MASK
             | CLPCR_BYPASS_LPM_HS0 | CLPCR_BYPASS_LPM_HS1;
-  GPC_IMR(GPR_IRQ / 32u) |= (1u << (GPR_IRQ % 32u));   /* step 3: re-mask  */
+
+  /* ARM_CLK_DIS_ON_LPM deliberately ABSENT: gating the ARM clock domain from
+     * 600 MHz overdrive wedges the exit (bisected 2026-07-11; NXP's reference
+     * downshifts to LowSpeedRun before ever setting it). Deferred: downshift
+     * subproject / EVKB investigation.
+  */
+  GPC_IMR(GPR_IRQ / 32u) |= (1u << (GPR_IRQ % 32u));    /* bracket close */
 }
 
 void lpm_run_config(void) {

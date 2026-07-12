@@ -12,6 +12,8 @@
 #include <mpu.h>
 #include <cronus/sem.h>
 #include <lpm.h>
+#include <imxrt1062.h>
+#include <board.h>
 
 #define MAX_TASKS 8
 #define MAX_PRIO  32
@@ -136,8 +138,10 @@ static void tickless_sleep(uint32_t idle_ticks) {
 
   gpt_start(interval);
   lpm_wait_config();
+  GPIO6_DR ^= SCOPE_PIN_17;
   __asm volatile ("dsb" ::: "memory");
   __asm volatile ("wfi" ::: "memory");
+  GPIO6_DR ^= SCOPE_PIN_17;
   lpm_run_config();
 
   uint32_t elapsed = gpt_stop_return_elapsed();
