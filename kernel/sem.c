@@ -8,53 +8,6 @@
 
 extern tcb_t* curr_task;
 
-static void wait_insert(semaphore_t* s, tcb_t* t) {
-  if(s == NULL || t == NULL) {
-    return;
-  }
-
-  t->ev_next = t->ev_prev = NULL;
-  t->wait_head = &s->wait_list;
-  if(s->wait_list == NULL || t->priority > s->wait_list->priority) {
-    t->ev_next = s->wait_list;
-    if(s->wait_list) {
-      s->wait_list->ev_prev = t;
-    }
-    s->wait_list = t;
-    return;
-  }
-
-  tcb_t* ct = s->wait_list;
-  while (ct->ev_next && t->priority <= ct->ev_next->priority) {
-    ct = ct->ev_next;
-  }
-
-  t->ev_next = ct->ev_next;
-  t->ev_prev = ct;
-  if (ct->ev_next) {
-    ct->ev_next->ev_prev = t;
-  }
-  ct->ev_next = t;
-}
-
-static tcb_t* wait_pop_highest(semaphore_t* s) {
-  if(s == NULL) {
-    return NULL;
-  }
-
-  tcb_t* t = s->wait_list;
-  if(t) {
-    s->wait_list = t->ev_next;
-    if(s->wait_list) {
-      s->wait_list->ev_prev = NULL;
-    }
-    t->ev_next = t->ev_prev = NULL;
-    t->wait_head = NULL;
-  }
-
-  return t;
-}
-
 void sem_init(semaphore_t* s, int32_t initial, int32_t max_count) {
   if(s == NULL || max_count <= 0 || initial < 0) {
     return;
@@ -64,7 +17,6 @@ void sem_init(semaphore_t* s, int32_t initial, int32_t max_count) {
   s->max_count = max_count;
   s->wait_list = NULL;
 }
-
 
 int sem_take(semaphore_t* s, uint32_t timeout_ms) {
   enter_critical();
@@ -88,7 +40,7 @@ int sem_take(semaphore_t* s, uint32_t timeout_ms) {
     curr_task->wait_result = 0;
 
     curr_task->state = TASK_BLOCKED;
-    wait_insert(s, curr_task);
+    wait_insert(&s->wait_list, curr_task);
 
     if(timeout_ms != SEM_WAIT_FOREVER) {
       uint32_t now = get_tick_count();
@@ -110,7 +62,7 @@ void sem_give(semaphore_t* s) {
       return;
     }
 
-    tcb_t* t = wait_pop_highest(s);
+    tcb_t* t = wait_pop_highest(&s->wait_list);
     if(t) {
       unlink_task_from_list(t);
 
@@ -143,7 +95,7 @@ int sem_give_from_isr(semaphore_t* s) {
     }
 
     int preempt = 0;
-    tcb_t* t = wait_pop_highest(s);
+    tcb_t* t = wait_pop_highest(&s->wait_list);
     if(t) {
       unlink_task_from_list(t);
 

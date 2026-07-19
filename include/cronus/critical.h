@@ -1,3 +1,4 @@
+#pragma once
 #include <stdint.h>
 
 void enter_critical(void);

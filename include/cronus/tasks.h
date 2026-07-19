@@ -6,6 +6,8 @@
 typedef uint32_t task_handle_t;
 #define NULL_TASK_HANDLE ((task_handle_t)0)
 
+struct mutex;
+
 typedef enum {
   TASK_READY,
   TASK_RUNNING,
@@ -32,23 +34,26 @@ typedef enum {
 #define TASK_WAIT_FOREVER 0xFFFFFFFFu
 
 typedef struct tcb {
-  uint32_t*    sp;
-  uint8_t      priority;
-  uint32_t*    stack_base;
-  uint32_t     stack_size;
-  const char*  name;
-  task_state_e state;
-  uint32_t     wake;
-  uint16_t     generation;
-  uint8_t      resume_resleep;
-  struct tcb*  next;
-  struct tcb*  prev;
-  struct tcb*  ev_next;
-  struct tcb*  ev_prev;
-  struct tcb** wait_head;
-  int          wait_result;
-  uint32_t     notify_value[CONFIG_NOTIFY_SLOTS];
-  uint8_t      notify_state[CONFIG_NOTIFY_SLOTS];
+  uint32_t*     sp;
+  uint8_t       priority;
+  uint8_t       base_priorty;
+  uint32_t*     stack_base;
+  uint32_t      stack_size;
+  const char*   name;
+  task_state_e  state;
+  uint32_t      wake;
+  uint16_t      generation;
+  uint8_t       resume_resleep;
+  struct tcb*   next;
+  struct tcb*   prev;
+  struct tcb*   ev_next;
+  struct tcb*   ev_prev;
+  struct tcb**  wait_head;
+  int           wait_result;
+  uint32_t      notify_value[CONFIG_NOTIFY_SLOTS];
+  uint8_t       notify_state[CONFIG_NOTIFY_SLOTS];
+  struct mutex* blocking_mutex;
+  struct mutex* held_mutexes;
 } tcb_t;
 
 
@@ -109,3 +114,9 @@ static inline int notify(task_handle_t h, uint32_t value, notify_action_e action
 static inline uint32_t notify_from_isr(task_handle_t h, uint32_t value, notify_action_e action) {
   return notify_indexed_from_isr(h, 0, value, action);
 }
+
+
+void wait_insert(tcb_t** head, tcb_t* t);
+tcb_t* wait_pop_highest(tcb_t** head);
+void task_set_priority(tcb_t* t, uint32_t new_p);
+uint8_t task_priority_self(void);

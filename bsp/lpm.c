@@ -4,6 +4,10 @@
 #include <lpm.h>
 #include <gpt.h>
 
+
+#define CCM_CGPR                  (*(volatile uint32_t *)0x400FC064u)
+#define CCM_CGPR_INT_MEM_CLK_LPM  (1u << 17)
+
 /* True WAIT-mode entry for tickless idle - hardware-verified July 2026.
  * Three pieces, all mandatory; each was independently fatal when missing:
  *   1. CLPCR bit-set: bare LPM=01 wedges on SCU/L2CC/HS handshakes this

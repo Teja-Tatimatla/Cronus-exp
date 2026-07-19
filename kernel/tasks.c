@@ -15,7 +15,6 @@
 #include <imxrt1062.h>
 #include <board.h>
 
-#define MAX_TASKS 8
 #define MAX_PRIO  32
 #define STACK_FILL 0xA5A5A5A5u
 #define SW_CANARY_WIDTH 4u
@@ -25,7 +24,7 @@
 
 static uint32_t num_tasks = 0;
 
-static tcb_t tcbs[MAX_TASKS];
+static tcb_t tcbs[CONFIG_MAX_TASKS];
 tcb_t* curr_task;
 tcb_t* idle_task_tcb;
 
@@ -138,10 +137,10 @@ static void tickless_sleep(uint32_t idle_ticks) {
 
   gpt_start(interval);
   lpm_wait_config();
-  GPIO6_DR ^= SCOPE_PIN_17;
+  //GPIO6_DR ^= SCOPE_PIN_17;
   __asm volatile ("dsb" ::: "memory");
   __asm volatile ("wfi" ::: "memory");
-  GPIO6_DR ^= SCOPE_PIN_17;
+  //GPIO6_DR ^= SCOPE_PIN_17;
   lpm_run_config();
 
   uint32_t elapsed = gpt_stop_return_elapsed();
@@ -311,6 +310,110 @@ void wait_abort(tcb_t* t) {
   t->ev_next = t->ev_prev = NULL;
   t->wait_head = NULL;
   t->wait_result = 0;
+}
+
+void wait_insert(tcb_t** head, tcb_t* t) {
+  if(head == NULL || t == NULL) {
+    return;
+  }
+
+  t->ev_next = t->ev_prev = NULL;
+  t->wait_head = head;
+  if(head == NULL || t->priority > (*head)->priority) {
+    t->ev_next = *head;
+    if(*head) {
+      (*head)->ev_prev = t;
+    }
+    *head = t;
+    return;
+  }
+
+  tcb_t* ct = *head;
+  while (ct->ev_next && t->priority <= ct->ev_next->priority) {
+    ct = ct->ev_next;
+  }
+
+  t->ev_next = ct->ev_next;
+  t->ev_prev = ct;
+  if (ct->ev_next) {
+    ct->ev_next->ev_prev = t;
+  }
+  ct->ev_next = t;
+}
+
+tcb_t* wait_pop_highest(tcb_t** head) {
+  if(head == NULL) {
+    return NULL;
+  }
+
+  tcb_t* t = *head;
+  if(t) {
+    *head = t->ev_next;
+    if(*head) {
+      (*head)->ev_prev = NULL;
+    }
+    t->ev_next = t->ev_prev = NULL;
+    t->wait_head = NULL;
+  }
+
+  return t;
+}
+
+static void wait_reprioritize(tcb_t* t, uint32_t new_p) {
+  tcb_t** head = t->wait_head;
+  if(*head == NULL) {
+    t->priority = new_p;
+    return;
+  }
+
+  if(t->ev_prev) {
+    t->ev_prev->ev_next = t->ev_next;
+  } else {
+    *head = t->ev_next;
+  }
+
+  if(t->ev_next) {
+    t->ev_next->ev_prev = t->ev_prev;
+  }
+
+  t->ev_next = t->ev_prev = NULL;
+  t->priority = new_p;
+
+  wait_insert(head, t);
+}
+
+void task_set_priority(tcb_t* t, uint32_t new_p) {
+  if(t == NULL || new_p > MAX_PRIO || t->priority == new_p) {
+    return;
+  }
+
+  switch(t->state) {
+    case TASK_RUNNING:
+    case TASK_READY:
+      unlink_task_from_list(t);
+      t->priority = new_p;
+      insert_ready_task(t);
+      break;
+
+    case TASK_BLOCKED:
+      if(t->wait_head != NULL) {
+       wait_reprioritize(t, new_p);
+      } else {
+        t->priority = new_p;
+      }
+      break;
+
+    default:
+      t->priority = new_p;
+      break;
+  }
+}
+
+uint8_t task_priority_self(void) {
+  if(curr_task == NULL) {
+    return 0;
+  }
+  return curr_task->priority;
 }
 
 void unlink_task_from_list(tcb_t* t) {
@@ -545,12 +648,12 @@ task_handle_t create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_s
     }
 
     if(!t) {
-    if(num_tasks >= MAX_TASKS) {
-      exit_critical();
-      return NULL_TASK_HANDLE;
-    }
-    idx = num_tasks++;
-    t = &tcbs[idx];
+      if(num_tasks >= CONFIG_MAX_TASKS) {
+        exit_critical();
+        return NULL_TASK_HANDLE;
+      }
+      idx = num_tasks++;
+      t = &tcbs[idx];
     }
 
     t->generation++;
@@ -560,6 +663,8 @@ task_handle_t create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_s
     t->wait_result = 0;
     t->wait_head = NULL;
     t->ev_next = t->ev_prev = NULL;
+    t->blocking_mutex = NULL;
+    t->held_mutexes = NULL;
 
     for (uint32_t s = 0; s < CONFIG_NOTIFY_SLOTS; s++) {
       t->notify_value[s] = 0;
@@ -572,6 +677,7 @@ task_handle_t create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_s
 
     t->sp = init_task(stack + stack_size, entry, task_return);
     t->priority = priority;
+    t->base_priorty = priority;
     t->state = TASK_READY;
     t->stack_base = stack;
     t->stack_size = stack_size;
@@ -662,7 +768,8 @@ static const char* task_state_as_str(const tcb_t* t) {
 }
 
 void task_hwm(const tcb_t* t) {
-  uart_printf("Task: %s, free stack: %d words, task state: %s\r\n", t->name, (unsigned)task_free_words(t), task_state_as_str(t));
+  uart_printf("Task: %s, free stack: %d words, task state: %s, priority: %u(%u)\r\n",
+    t->name, (unsigned)task_free_words(t), task_state_as_str(t), (unsigned)t->priority, (unsigned)t->base_priorty);
 }
 
 void task_reporter() {
@@ -699,7 +806,7 @@ void resume_all_tasks(void) {
 
 // task notifications - start
 uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit) {
-  if(slot > CONFIG_NOTIFY_SLOTS) {
+  if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
 
@@ -737,7 +844,7 @@ uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit
 }
 
 uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exit, uint32_t* out, uint32_t time_out) {
-  if(slot > CONFIG_NOTIFY_SLOTS) {
+  if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
 
@@ -821,15 +928,18 @@ static int notify_apply(tcb_t* t, uint32_t slot, uint32_t value, notify_action_e
   }
 
   if(delivered) {
-    *preempt = notify_wake_if_blocked(t, slot);
+    /* This order is important
+     * wakes, may yield caller ...THEN sets the latch
+    */
     t->notify_state[slot] = NOTIFY_PENDING;
+    *preempt = notify_wake_if_blocked(t, slot);
   }
 
   return delivered;
 }
 
 int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
-  if(slot > CONFIG_NOTIFY_SLOTS) {
+  if(slot >= CONFIG_NOTIFY_SLOTS) {
     return -1;
   }
 
@@ -852,7 +962,7 @@ int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action
 }
 
 uint32_t notify_indexed_from_isr(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
-  if(slot > CONFIG_NOTIFY_SLOTS) {
+  if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
 

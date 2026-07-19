@@ -10,6 +10,8 @@ _Static_assert(CORE_HZ % TICK_HZ == 0,
 _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
                "reload exceeds SysTick's 24-bit RVR");
 
+#define CONFIG_MAX_TASKS 8
+
 #define CONFIG_USE_IDLE_HOOK 1
 #define CONFIG_USE_TICKLESS_IDLE 1
 #define TICKLESS_THRESHOLD 50u
@@ -27,3 +29,6 @@ _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
 #define SW_STACK_GUARD_MODE 2
 
 #define CONFIG_NOTIFY_SLOTS 5
+
+#define CONFIG_MUTEX_PRIORITY_INHERITANCE 1
+#define CONFIG_MUTEX_CHAIN_MAX CONFIG_MAX_TASKS
