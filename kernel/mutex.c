@@ -128,7 +128,7 @@ int mutex_lock(mutex_t* m, uint32_t time_out) {
     curr_task->wait_result = 1;
     wait_insert(&m->wait_list, curr_task);
 
-    if(time_out != MUTEX_WAIT_FOREVER) {
+    if(time_out != WAIT_FOREVER) {
       uint32_t now = get_tick_count();
       curr_task->wake = now + time_out;
       insert_delayed_task(curr_task, now);

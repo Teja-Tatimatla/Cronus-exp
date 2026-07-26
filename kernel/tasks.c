@@ -319,7 +319,7 @@ void wait_insert(tcb_t** head, tcb_t* t) {
 
   t->ev_next = t->ev_prev = NULL;
   t->wait_head = head;
-  if(head == NULL || t->priority > (*head)->priority) {
+  if(*head == NULL || t->priority > (*head)->priority) {
     t->ev_next = *head;
     if(*head) {
       (*head)->ev_prev = t;
@@ -665,6 +665,8 @@ task_handle_t create_task(uint32_t* stack, void (*entry)(void), uint32_t stack_s
     t->ev_next = t->ev_prev = NULL;
     t->blocking_mutex = NULL;
     t->held_mutexes = NULL;
+    t->q_xfer = NULL;
+    t->q_to_front = 0;
 
     for (uint32_t s = 0; s < CONFIG_NOTIFY_SLOTS; s++) {
       t->notify_value[s] = 0;
@@ -822,7 +824,7 @@ uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit
 
       curr_task->state = TASK_BLOCKED;
 
-      if(time_out != TASK_WAIT_FOREVER) {
+      if(time_out != WAIT_FOREVER) {
         uint32_t now = get_tick_count();
         curr_task->wake = now + time_out;
         insert_delayed_task(curr_task, now);
@@ -862,7 +864,7 @@ uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exi
 
       curr_task->state = TASK_BLOCKED;
 
-      if(time_out != TASK_WAIT_FOREVER) {
+      if(time_out != WAIT_FOREVER) {
         uint32_t now = get_tick_count();
         curr_task->wake = now + time_out;
         insert_delayed_task(curr_task, now);

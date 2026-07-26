@@ -16,6 +16,7 @@ void SysTick_Handler(void)   __attribute__((weak, alias("Default_Handler")));
 void LPUART6_Handler(void)   __attribute__((weak, alias("Default_Handler")));
 void GPT1_Handler(void)      __attribute__((weak, alias("Default_Handler")));
 void MemManage_Handler(void) __attribute__((weak, alias("Default_Handler")));
+void GPT2_Handler(void)      __attribute__((weak, alias("Default_Handler")));
 
 __attribute__((section(".isr_vector"), used))
 const void *vector_table[] = {
@@ -34,7 +35,8 @@ const void *vector_table[] = {
   0, 0, 0, 0, 0, 0, 0, 0, /*  [32 - 39] */
   0,                      /*  [40] */
   LPUART6_Handler,        /*  [41] */
-  [116] = GPT1_Handler    /*  IRQ 100 (GPT1) -> vector 116 */
+  [116] = GPT1_Handler,    /*  IRQ 100 (GPT1) -> vector 116 */
+  [117] = GPT2_Handler
 };
 
 void Default_Handler(void) {

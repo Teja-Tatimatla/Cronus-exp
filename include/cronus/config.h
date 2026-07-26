@@ -16,6 +16,8 @@ _Static_assert((CORE_HZ / TICK_HZ) - 1u <= 0xFFFFFFu,
 #define CONFIG_USE_TICKLESS_IDLE 1
 #define TICKLESS_THRESHOLD 50u
 
+#define WAIT_FOREVER 0xFFFFFFFFu
+
 /*
  * Tsis is from
  * Chapter 13 Clock and Power Management

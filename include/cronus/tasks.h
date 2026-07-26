@@ -31,8 +31,6 @@ typedef enum {
   NOTIFY_SET_VALUE_NO_OVERWRITE
 } notify_action_e;
 
-#define TASK_WAIT_FOREVER 0xFFFFFFFFu
-
 typedef struct tcb {
   uint32_t*     sp;
   uint8_t       priority;
@@ -54,6 +52,8 @@ typedef struct tcb {
   uint8_t       notify_state[CONFIG_NOTIFY_SLOTS];
   struct mutex* blocking_mutex;
   struct mutex* held_mutexes;
+  void*         q_xfer;
+  uint8_t       q_to_front;
 } tcb_t;
 
 
