@@ -19,6 +19,7 @@ add_executable(cronus.elf
   kernel/mutex.c
   kernel/queue.c
   kernel/cstrings.c
+  kernel/timer.c
   bsp/boot.c
   bsp/clock.c
   bsp/gpt.c

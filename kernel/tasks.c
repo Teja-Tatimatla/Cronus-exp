@@ -124,14 +124,25 @@ void task_return(void) {
 
 #if CONFIG_USE_TICKLESS_IDLE
 static void tickless_sleep(uint32_t idle_ticks) {
-  uint32_t per_tick = (GPT_CLK_HZ/TICK_HZ);            /* 24000 GPT clocks / 1 ms */
-  uint32_t max_ticks = 0xFFFFFFFFu / per_tick;         /* 32-bit counter headroom */
+  uint32_t per_tick = (GPT_CLK_HZ/TICK_HZ);                   /* 24000 GPT clocks / 1 ms */
+  /*
+   * max_ticks = 0xFFFFFFFF / 24000 = 178956, so interval can reach 4,294,944,000 —
+   * only 23,296 counts below the uint32_t ceiling, and the carry can approach 24,000.
+   * Adding them wraps. Cheap fix:
+   * uint32_t max_ticks = (0xFFFFFFFFu / per_tick) - 2u;
+   * instead of:
+   * uint32_t max_ticks = 0xFFFFFFFFu / per_tick;
+   */
+  uint32_t max_ticks = (0xFFFFFFFFu / per_tick) - 2u;
+  static uint32_t tickless_rem = 0;
 
   if(idle_ticks > max_ticks) {
     idle_ticks = max_ticks;
   }
   uint32_t interval = idle_ticks * per_tick;
 
+  uint32_t cvr = SYST_CVR;
+  tickless_rem += (SYST_RVR - cvr) * (GPT_CLK_HZ / SYSTICK_REF_HZ);
   systick_set_tickless(1);
   SYST_CSR = 0;             /* stop 1 ms tick; GPT keeps time */
 
@@ -143,8 +154,9 @@ static void tickless_sleep(uint32_t idle_ticks) {
   //GPIO6_DR ^= SCOPE_PIN_17;
   lpm_run_config();
 
-  uint32_t elapsed = gpt_stop_return_elapsed();
+  uint32_t elapsed = gpt_stop_return_elapsed() + tickless_rem;
   uint32_t slept_ticks = elapsed / per_tick;
+  tickless_rem = elapsed % per_tick;
   advance_tick_count(slept_ticks);
 
   /* restore 1 ms tick */
@@ -317,28 +329,21 @@ void wait_insert(tcb_t** head, tcb_t* t) {
     return;
   }
 
-  t->ev_next = t->ev_prev = NULL;
   t->wait_head = head;
-  if(*head == NULL || t->priority > (*head)->priority) {
-    t->ev_next = *head;
-    if(*head) {
-      (*head)->ev_prev = t;
-    }
-    *head = t;
-    return;
+
+  tcb_t** pp = head;
+  tcb_t*  prev = NULL;
+  while(*pp && t->priority <= (*pp)->priority) {
+    prev = *pp;
+    pp = &(*pp)->ev_next;
   }
 
-  tcb_t* ct = *head;
-  while (ct->ev_next && t->priority <= ct->ev_next->priority) {
-    ct = ct->ev_next;
+  t->ev_next = *pp;
+  t->ev_prev = prev;
+  if(*pp) {
+    (*pp)->ev_prev = t;
   }
-
-  t->ev_next = ct->ev_next;
-  t->ev_prev = ct;
-  if (ct->ev_next) {
-    ct->ev_next->ev_prev = t;
-  }
-  ct->ev_next = t;
+  *pp = t;
 }
 
 tcb_t* wait_pop_highest(tcb_t** head) {
@@ -449,20 +454,13 @@ static tcb_t* pick_next_task() {
 }
 
 static void insert_delayed_into(tcb_t** list, tcb_t* t) {
-  t->next = NULL;
-  if(*list == NULL || t->wake < (*list)->wake) {
-    t->next = *list;
-    *list = t;
-    return;
+  tcb_t** pp = list;
+  while(*pp && t->wake >= (*pp)->wake) {
+    pp = &(*pp)->next;
   }
 
-  tcb_t* curr = *list;
-  while(curr->next != NULL && t->wake > curr->next->wake) {
-    curr = curr->next;
-  }
-
-  t->next = curr->next;
-  curr->next = t;
+  t->next = *pp;
+  *pp = t;
 }
 
 void insert_delayed_task(tcb_t* t, uint32_t now) {
