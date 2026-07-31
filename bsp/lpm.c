@@ -3,6 +3,7 @@
 #include <cm7.h>                       /* GPC_IMR(n) */
 #include <lpm.h>
 #include <gpt.h>
+#include <board.h>
 
 
 #define CCM_CGPR                  (*(volatile uint32_t *)0x400FC064u)
@@ -50,7 +51,8 @@ void lpm_init(void) {
   GPC_IMR(1) = 0xFFFFFFFFu;
   GPC_IMR(2) = 0xFFFFFFFFu;
   GPC_IMR(3) = 0xFFFFFFFFu;
-  GPC_IMR(GPT1_IRQ / 32u) &= ~(1u << (GPT1_IRQ % 32u));   /* GPT1 back in — the wake */
+  GPC_IMR(GPT1_IRQ / 32u) &= ~(1u << (GPT1_IRQ % 32u));         /* GPT1 back in — the wake */
+  GPC_IMR(LPUART6_IRQ / 32u) &= ~(1u << (LPUART6_IRQ % 32u));   /* LPUART6 back in — the wake */
 
   IOMUXC_GPR_GPR1 |= IOMUXC_GPR_GPR1_GINT;              /* ERR050143 step 1 */
 }

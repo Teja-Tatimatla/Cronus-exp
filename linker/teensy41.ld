@@ -34,6 +34,17 @@ SECTIONS {
     . = ALIGN(4);
     _stext = .;
     *(.text*)
+
+    . = ALIGN(4);
+    __device_pre_start = .;
+    KEEP(*(SORT_BY_NAME(.device_init.0_*)))
+    __device_pre_end = .;
+
+    . = ALIGN(4);
+    __device_post_start = .;
+    KEEP(*(SORT_BY_NAME(.device_init.1_*)))
+    __device_post_end = .;
+
     *(.rodata*)
     . = ALIGN(4);
     _etext = .;

@@ -11,6 +11,7 @@
 
 #define CCM_CCGR3           (*(volatile uint32_t *)0x400FC074)
 #define CCM_CCGR1           (*(volatile uint32_t *)0x400FC06C)
+#define CCM_CCGR2           (*(volatile uint32_t *)0x400FC070)
 
 #define CCM_CSCDR1          (*(volatile uint32_t *)0x400FC024)
 

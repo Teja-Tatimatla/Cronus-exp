@@ -29,6 +29,8 @@
 
 /* NVIC Interrupt Set-Enabled Registers */
 #define NVIC_ISER(n)       (*(volatile uint32_t *)(0xE000E100 + 4u*(n)))
+/* NVIC Interrupt Clear Enable Register */
+#define NVIC_ICER(n)       (*(volatile uint32_t *)(0xE000E180 + 4u*(n)))
 
 /* Interrupt Priority Register
  * Byte Form no 4u*(n)

@@ -20,12 +20,18 @@ add_executable(cronus.elf
   kernel/queue.c
   kernel/cstrings.c
   kernel/timer.c
+  kernel/device.c
   bsp/boot.c
   bsp/clock.c
   bsp/gpt.c
   bsp/lpm.c
-  app/main.c
+  bsp/irq.c
   drivers/uart.c
+  drivers/gpio_imxrt.c
+  drivers/pinctrl_imxrt.c
+  drivers/sensor_fake.c
+  app/main.c
+  app/board_pins.c
 )
 
 target_include_directories(cronus.elf PRIVATE

@@ -1,4 +1,6 @@
 #include <stdint.h>
+
+#include <cronus/irq.h>
 /* ARM exception/interrupt vector table (the .isr_vector the core dispatches
    through). Distinct from the i.MX boot IVT in bsp/boot.c.
    NOTE: weak aliases must reference a symbol defined in THIS translation unit,
@@ -13,10 +15,7 @@ void HardFault_Handler(void) __attribute__((weak, alias("Default_Handler")));
 void SVC_Handler(void)       __attribute__((weak, alias("Default_Handler")));
 void PendSV_Handler(void)    __attribute__((weak, alias("Default_Handler")));
 void SysTick_Handler(void)   __attribute__((weak, alias("Default_Handler")));
-void LPUART6_Handler(void)   __attribute__((weak, alias("Default_Handler")));
-void GPT1_Handler(void)      __attribute__((weak, alias("Default_Handler")));
 void MemManage_Handler(void) __attribute__((weak, alias("Default_Handler")));
-void GPT2_Handler(void)      __attribute__((weak, alias("Default_Handler")));
 
 __attribute__((section(".isr_vector"), used))
 const void *vector_table[] = {
@@ -30,15 +29,11 @@ const void *vector_table[] = {
   0, 0,
   PendSV_Handler,         /* [14] */
   SysTick_Handler,        /* [15] */
-  0, 0, 0, 0, 0, 0, 0, 0, /*  [16 - 23] */
-  0, 0, 0, 0, 0, 0, 0, 0, /*  [24 - 31] */
-  0, 0, 0, 0, 0, 0, 0, 0, /*  [32 - 39] */
-  0,                      /*  [40] */
-  LPUART6_Handler,        /*  [41] */
-  [116] = GPT1_Handler,    /*  IRQ 100 (GPT1) -> vector 116 */
-  [117] = GPT2_Handler
+  [16 ... 175] = irq_dispatch,
 };
 
 void Default_Handler(void) {
-  while (1);
+  while (1) {
+    __asm volatile ("nop");
+  }
 }
