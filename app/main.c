@@ -1,3 +1,4 @@
+#include "cache.h"
 #include "cronus/config.h"
 #include <stdint.h>
 
@@ -163,15 +164,13 @@ typedef struct {
 static d6_ctx_t d6_ctx;
 
 static void d6_handler(void* arg) {
-  uint32_t t1 = DWT_CYCCNT;
   GPT2_SR = GPT_SR_OF1;
   GPT2_OCR1 = GPT2_CNT + (GPT_CLK_HZ / 2u);
   d6_ctx_t* ctx = arg;
   ctx->seq++;
   uart_printf("evt %u, arg %s, dispatch overhead %u cycles\r\n",
               (unsigned)ctx->seq,
-              (arg == &d6_ctx) ? "ok" : "WRONG",
-              (unsigned)(t1 - irq_dispatch_t0));
+              (arg == &d6_ctx) ? "ok" : "WRONG");
 }
 
 static void d6_task(void) {
@@ -280,6 +279,9 @@ int main(void) {
   init_fpu();
   init_uart();
   init_dwt();
+  init_mpu();
+  icache_enable();
+  dcache_enable();
 
   lpm_init();
 

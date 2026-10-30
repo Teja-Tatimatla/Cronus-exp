@@ -38,7 +38,7 @@ void gpt_init(void) {
   driver_irq_enable(GPT1_IRQ, 0x80);
 }
 
-void gpt_start(uint32_t clocks) {
+__itcm void gpt_start(uint32_t clocks) {
   GPT1_CR &= ~GPT_CR_EN;
   GPT1_SR = GPT_SR_OF1;  /* clear stale compare flag */
   GPT1_OCR1 = clocks;
@@ -46,7 +46,7 @@ void gpt_start(uint32_t clocks) {
   GPT1_CR |= GPT_CR_EN;
 }
 
-uint32_t gpt_stop_return_elapsed(void) {
+__itcm uint32_t gpt_stop_return_elapsed(void) {
   uint32_t cnt = GPT1_CNT;
   GPT1_CR &= ~GPT_CR_EN;
   GPT1_SR = GPT_SR_OF1;
@@ -54,7 +54,7 @@ uint32_t gpt_stop_return_elapsed(void) {
   return cnt;
 }
 
-static void GPT1_isr(void* arg) {
+static __itcm void GPT1_isr(void* arg) {
   (void)arg;
   GPT1_SR = GPT_SR_OF1; /* acknowledge */
 }

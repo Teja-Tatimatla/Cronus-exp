@@ -9,7 +9,6 @@ typedef struct {
 } irq_slot_t;
 
 static volatile irq_slot_t irq_table[NUM_IRQS];
-volatile uint32_t irq_dispatch_t0;
 
 void Default_Handler(void);
 
@@ -43,8 +42,7 @@ int driver_irq_connect(uint32_t irq, irq_handler_fn handler, void *arg) {
   return 1;
 }
 
-void irq_dispatch(void) {
-  irq_dispatch_t0 = DWT_CYCCNT;
+__itcm void irq_dispatch(void) {
   uint32_t ipsr;
   __asm volatile ("mrs %0, ipsr" : "=r"(ipsr));
   uint32_t irq = ipsr - 16u;

@@ -1,6 +1,7 @@
 #include <cronus/tasks.h>
 #include <stdint.h>
 #include <uart.h>
+#include <cm7.h>
 
 #define CFSR              (*(volatile uint32_t *)0xE000ED28)
 #define HFSR              (*(volatile uint32_t *)0xE000ED2C)
@@ -36,7 +37,7 @@ void hard_fault_report(uint32_t* frame, uint32_t exc_return) {
   }
 }
 
-__attribute__((naked))
+__itcm __attribute__((naked))
 void HardFault_Handler(void) {
   __asm volatile (
     "tst lr, #4           \n"   /* EXC_RETURN bit2: which stack was active */
@@ -76,7 +77,7 @@ void mem_fault_report(uint32_t* frame) {
   }
 }
 
-__attribute__((naked))
+__itcm __attribute__((naked))
 void MemManage_Handler(void) {
   __asm volatile (
     "tst lr, #4             \n"

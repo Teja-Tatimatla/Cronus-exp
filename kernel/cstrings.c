@@ -14,7 +14,7 @@ void* cr_memcpy(void* dest, const void* src, unsigned long n) {
   return d;
 }
 
-int cr_strcmp(const char *a, const char *b) {
+int cr_strcmp(const char* a, const char* b) {
   if(a == NULL || b == NULL) {
     return (a == b) ? 1 : 0;
   }

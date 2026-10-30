@@ -10,7 +10,6 @@ struct device_state {
   uint8_t  ready;
   uint8_t  suspended;
   int8_t   init_res;
-  uint32_t init_cycles;
 };
 
 struct device {

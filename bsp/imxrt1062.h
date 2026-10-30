@@ -53,3 +53,11 @@
 #define GPIO6_GDIR          (*(volatile uint32_t *)0x42000004)
 #define GPIO6_DR            (*(volatile uint32_t *)0x42000000)
 #define IOMUXC_GPR_GPR26    (*(volatile uint32_t *)0x400AC068)
+
+/* Partition Registers */
+#define IOMUXC_GPR_GPR16_ADDR      0x400AC040
+#define IOMUXC_GPR_GPR17_ADDR      0x400AC044
+#define IOMUXC_GPR_GPR16           (*(volatile uint32_t *)(uintptr_t)IOMUXC_GPR_GPR16_ADDR)
+#define IOMUXC_GPR_GPR17           (*(volatile uint32_t *)(uintptr_t)IOMUXC_GPR_GPR17_ADDR)
+#define GPR16_FLEXRAM_BANK_CFG_SEL (1u << 2)
+# define FLEXRAM_BANK_CFG          0xAAAAFFFF

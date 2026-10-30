@@ -57,7 +57,7 @@ void lpm_init(void) {
   IOMUXC_GPR_GPR1 |= IOMUXC_GPR_GPR1_GINT;              /* ERR050143 step 1 */
 }
 
-void lpm_wait_config(void) {
+__itcm void lpm_wait_config(void) {
   GPC_IMR(GPR_IRQ / 32u) &= ~(1u << (GPR_IRQ % 32u));
   uint32_t clpcr = CCM_CLPCR & ~(CLPCR_LPM_MASK | CLPCR_ARM_CLK_DIS_ON_LPM);
   CCM_CLPCR = clpcr | CLPCR_LPM_WAIT
@@ -73,6 +73,6 @@ void lpm_wait_config(void) {
   GPC_IMR(GPR_IRQ / 32u) |= (1u << (GPR_IRQ % 32u));    /* bracket close */
 }
 
-void lpm_run_config(void) {
+__itcm void lpm_run_config(void) {
   CCM_CLPCR &= ~(CLPCR_LPM_MASK | CLPCR_ARM_CLK_DIS_ON_LPM);
 }

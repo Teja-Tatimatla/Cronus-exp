@@ -3,6 +3,9 @@
 /* ARM Cortex-M7 (ARMv7-M) core registers - System Control Space (0xE000_xxxx).
    Architectural: identical on any Cortex-M7, so they live in arch/, not bsp/. */
 
+
+#define __itcm             __attribute__((section(".itcm.text")))
+
 #define SCB_VTOR           (*(volatile uint32_t *)0xE000ED08)
 
 /* Debug Exception and Monitor Control */
@@ -46,6 +49,26 @@
 #define SCB_ICSR           (*(volatile uint32_t *)0xE000ED04)
 #define ICSR_PENDSVSET     (1u << 28)
 #define ICSR_PENDSTCLR     (1u << 25)
+
+/* Cache Registers */
+#define SCB_CCR             (*(volatile uint32_t *)0xE000ED14)
+#define SCB_CCSIDR          (*(volatile uint32_t *)0xE000ED80)
+#define SCB_CSSELR          (*(volatile uint32_t *)0xE000ED84)
+#define SCB_ICIALLU         (*(volatile uint32_t *)0xE000EF50)
+#define SCB_DCISW           (*(volatile uint32_t *)0xE000EF60)
+
+#define SCB_CCR_DC          (1u << 16)
+#define SCB_CCR_IC          (1u << 17)
+#define CCSIDR_SETS(r)      (((r) >> 13) & 0x7FFFu)
+#define DCACHE_WAYS         4u
+#define DCISW_WAY_POS       30u
+#define DCISW_SET_POS       5u
+
+static inline uint32_t arch_get_msp(void) {
+  uint32_t v;
+  __asm volatile ("mrs %0, msp" : "=r"(v));
+  return v;
+}
 
 
 /* BASEPRI operations for critical sections */

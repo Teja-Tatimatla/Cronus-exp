@@ -6,15 +6,16 @@
 #include <cronus/tasks.h>
 #include <cronus/config.h>
 #include <systick.h>
+#include <cm7.h>
 
 extern tcb_t* curr_task;
 
-static void held_push(mutex_t* m, tcb_t* t) {
+static __itcm void held_push(mutex_t* m, tcb_t* t) {
   m->next_held = t->held_mutexes;
   t->held_mutexes = m;
 }
 
-static void held_remove(tcb_t* t, mutex_t* m) {
+static __itcm void held_remove(tcb_t* t, mutex_t* m) {
   struct mutex** hm = &t->held_mutexes;
   while(*hm && *hm != m) {
     hm = &(*hm)->next_held;
@@ -26,7 +27,7 @@ static void held_remove(tcb_t* t, mutex_t* m) {
 }
 
 #if CONFIG_MUTEX_PRIORITY_INHERITANCE
-static void inheritance_walk(tcb_t* owner, uint32_t priority) {
+static __itcm void inheritance_walk(tcb_t* owner, uint32_t priority) {
   uint32_t depth = 0;
   while(owner != NULL && depth++ < CONFIG_MUTEX_CHAIN_MAX) {
     if(owner->priority >= priority) {
@@ -42,11 +43,11 @@ static void inheritance_walk(tcb_t* owner, uint32_t priority) {
   }
 }
 
-static uint8_t top_waiter_priority(mutex_t* m) {
+static __itcm uint8_t top_waiter_priority(mutex_t* m) {
   return m->wait_list ? m->wait_list->priority : 0;
 }
 
-static uint8_t effective_floor(tcb_t* t) {
+static __itcm uint8_t effective_floor(tcb_t* t) {
   uint8_t floor = t->base_priorty;
   for(struct mutex* m = t->held_mutexes; m != NULL; m = m->next_held) {
     uint8_t wp = top_waiter_priority(m);
@@ -58,7 +59,7 @@ static uint8_t effective_floor(tcb_t* t) {
   return floor;
 }
 
-static void reevaluate_inheritance(tcb_t* t) {
+static __itcm void reevaluate_inheritance(tcb_t* t) {
   uint8_t floor = effective_floor(t);
   if(floor != t->priority) {
     task_set_priority(t, floor);
@@ -86,7 +87,7 @@ void init_mutex_recursive(mutex_t* m) {
   m->recursive = 1;
 }
 
-int mutex_lock(mutex_t* m, uint32_t time_out) {
+__itcm int mutex_lock(mutex_t* m, uint32_t time_out) {
   enter_critical();
     if(m == NULL) {
       exit_critical();
@@ -148,7 +149,7 @@ int mutex_lock(mutex_t* m, uint32_t time_out) {
   return curr_task->wait_result;
 }
 
-int mutex_unlock(mutex_t* m) {
+__itcm int mutex_unlock(mutex_t* m) {
   enter_critical();
     if(m == NULL || m->owner != curr_task) {
       exit_critical();

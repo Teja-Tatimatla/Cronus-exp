@@ -16,19 +16,19 @@ void init_sys_tick(void) {
   SYST_CSR = SYST_CSR_TICKINT | SYST_CSR_ENABLE;
 }
 
-uint32_t get_tick_count(void) {
+__itcm uint32_t get_tick_count(void) {
   return tick_count;
 }
 
-void systick_set_tickless(uint8_t on) {
+__itcm void systick_set_tickless(uint8_t on) {
   in_tickless = on;
 }
 
-void advance_tick_count(uint32_t ticks) {
+__itcm void advance_tick_count(uint32_t ticks) {
   tick_count += ticks;
 }
 
-void SysTick_Handler(void) {
+__itcm void SysTick_Handler(void) {
   if(in_tickless) {
     (void)SYST_CSR;
     return;

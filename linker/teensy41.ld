@@ -1,11 +1,11 @@
 MEMORY {
   FLASH     (rx)  : ORIGIN = 0x60000000, LENGTH = 1984k
-  ITCM      (rwx) : ORIGIN = 0x00000000, LENGTH = 512k
-  DTCM      (rwx) : ORIGIN = 0x20000000, LENGTH = 512k
-  RAM       (rwx) : ORIGIN = 0x20200000, LENGTH = 512k
+  ITCM      (rwx) : ORIGIN = 0x00000000, LENGTH = 256k
+  DTCM      (rwx) : ORIGIN = 0x20000000, LENGTH = 256k
+  OCRAM2    (rwx) : ORIGIN = 0x20200000, LENGTH = 512k
 }
 
-ENTRY(Reset_Handler)
+ENTRY(Reset_Trampoline)
 
 SECTIONS {
   .image : {
@@ -19,7 +19,7 @@ SECTIONS {
     . = ALIGN(4);
     KEEP(*(.bootcode))
     . = ALIGN(4);
-  } > FLASH      /* Reset_Handler + copy loop: runs XIP */
+  } > FLASH
 
   .isr_vector : {
     . = ALIGN(1024);
@@ -29,6 +29,15 @@ SECTIONS {
     _evector = .;
   } > ITCM AT > FLASH
   _sivector = LOADADDR(.isr_vector);
+
+  .itcm : {
+    . = ALIGN(4);
+    _sitcm = .;
+    *(.itcm.text*)
+    . = ALIGN(4);
+    _eitcm = .;
+  } > ITCM AT > FLASH
+  _siitcm = LOADADDR(.itcm);
 
   .text : {
     . = ALIGN(4);
@@ -48,8 +57,7 @@ SECTIONS {
     *(.rodata*)
     . = ALIGN(4);
     _etext = .;
-  } > ITCM AT > FLASH
-  _sitext = LOADADDR(.text);
+  } > FLASH
 
   .data : {
     . = ALIGN(4);

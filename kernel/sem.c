@@ -5,6 +5,7 @@
 #include <cronus/tasks.h>
 #include <cronus/critical.h>
 #include <systick.h>
+#include <cm7.h>
 
 extern tcb_t* curr_task;
 
@@ -18,7 +19,7 @@ void sem_init(semaphore_t* s, int32_t initial, int32_t max_count) {
   s->wait_list = NULL;
 }
 
-int sem_take(semaphore_t* s, uint32_t timeout_ms) {
+__itcm int sem_take(semaphore_t* s, uint32_t timeout_ms) {
   enter_critical();
     if(s == NULL) {
       exit_critical();
@@ -54,7 +55,7 @@ int sem_take(semaphore_t* s, uint32_t timeout_ms) {
   return curr_task->wait_result;
 }
 
-void sem_give(semaphore_t* s) {
+__itcm void sem_give(semaphore_t* s) {
   enter_critical();
 
     if(s == NULL) {
@@ -87,7 +88,7 @@ void sem_give(semaphore_t* s) {
   exit_critical();
 }
 
-int sem_give_from_isr(semaphore_t* s) {
+__itcm int sem_give_from_isr(semaphore_t* s) {
   uint32_t bpr = enter_critical_isr();
     if(s == NULL) {
       exit_critical_isr(bpr);

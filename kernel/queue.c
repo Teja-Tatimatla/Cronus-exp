@@ -8,6 +8,7 @@
 #include <cronus/config.h>
 #include <systick.h>
 #include <cronus/cstrings.h>
+#include <cm7.h>
 
 extern tcb_t* curr_task;
 
@@ -27,7 +28,7 @@ void init_queue(queue_t* q, void* data_container, uint32_t capacity, size_t data
   q->set = NULL;
 }
 
-static int wake_waiter(tcb_t* t) {
+static __itcm int wake_waiter(tcb_t* t) {
   unlink_task_from_list(t);
   t->wait_head = NULL;
   t->q_xfer = NULL;
@@ -37,25 +38,25 @@ static int wake_waiter(tcb_t* t) {
   return (t->priority > curr_task->priority);
 }
 
-static void copy_in_front(queue_t* q, const void* data) {
+static __itcm void copy_in_front(queue_t* q, const void* data) {
   q->tail = (q->tail + q->capacity - 1u) % q->capacity;
   cr_memcpy(q->buffer + (q->tail * q->data_size), data, q->data_size);
   q->count++;
 }
 
-static void copy_in(queue_t* q, const void* data) {
+static __itcm void copy_in(queue_t* q, const void* data) {
   cr_memcpy(q->buffer + (q->head * q->data_size), data, q->data_size);
   q->head = (q->head + 1u) % q->capacity;
   q->count++;
 }
 
-static void copy_out(queue_t* q, void* out) {
+static __itcm void copy_out(queue_t* q, void* out) {
   cr_memcpy(out, q->buffer + (q->tail * q->data_size), q->data_size);
   q->tail = (q->tail + 1u) % q->capacity;
   q->count--;
 }
 
-static int queue_notify_set(queue_t* q) {
+static __itcm int queue_notify_set(queue_t* q) {
   queue_t* set = q->set;
   if(set == NULL) {
     return 0;
@@ -74,7 +75,7 @@ static int queue_notify_set(queue_t* q) {
   return 0;
 }
 
-static int queue_send_common(queue_t* q, const void* data, uint32_t timeout, uint32_t to_front) {
+static __itcm int queue_send_common(queue_t* q, const void* data, uint32_t timeout, uint32_t to_front) {
   enter_critical();
     if(q == NULL || data == NULL) {
       exit_critical();
@@ -140,15 +141,15 @@ static int queue_send_common(queue_t* q, const void* data, uint32_t timeout, uin
   return curr_task->wait_result;
 }
 
-int queue_send(queue_t* q, const void* data, uint32_t timeout) {
+__itcm int queue_send(queue_t* q, const void* data, uint32_t timeout) {
   return queue_send_common(q, data, timeout, 0);
 }
 
-int queue_send_to_front(queue_t* q, const void* data, uint32_t timeout) {
+__itcm int queue_send_to_front(queue_t* q, const void* data, uint32_t timeout) {
   return queue_send_common(q, data, timeout, 1);
 }
 
-int queue_recv(queue_t* q, void* out, uint32_t timeout) {
+__itcm int queue_recv(queue_t* q, void* out, uint32_t timeout) {
   enter_critical();
     if(q == NULL || out == NULL) {
       exit_critical();
@@ -207,7 +208,7 @@ int queue_recv(queue_t* q, void* out, uint32_t timeout) {
   return curr_task->wait_result;
 }
 
-int queue_send_from_isr(queue_t* q, const void* data) {
+__itcm int queue_send_from_isr(queue_t* q, const void* data) {
   uint32_t bpr = enter_critical_isr();
     if(q == NULL || data == NULL) {
       exit_critical_isr(bpr);
@@ -228,7 +229,7 @@ int queue_send_from_isr(queue_t* q, const void* data) {
   return preempt;
 }
 
-int queue_peek(queue_t* q, void* out) {
+__itcm int queue_peek(queue_t* q, void* out) {
   enter_critical();
     if(q == NULL || out == NULL) {
       exit_critical();
@@ -246,7 +247,7 @@ int queue_peek(queue_t* q, void* out) {
   return 1;
 }
 
-uint32_t queue_count(queue_t* q) {
+__itcm uint32_t queue_count(queue_t* q) {
   enter_critical();
     if(q == NULL) {
       exit_critical();

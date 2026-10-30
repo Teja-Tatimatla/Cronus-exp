@@ -48,7 +48,7 @@ extern uint32_t* init_task(uint32_t* stack_top, void (*entry)(void), void (*task
 __attribute__((weak))
 void idle_hook() {}
 
-void yield(void) {
+__itcm void yield(void) {
   SCB_ICSR = ICSR_PENDSVSET;
   __asm volatile ("dsb" ::: "memory");
   __asm volatile ("isb" ::: "memory");
@@ -59,7 +59,7 @@ void yield(void) {
  *   2. slot is TASK_DEAD        -> task died, slot not yet reused
  *   3. generation mismatch      -> slot WAS reused since the handle was minted (the ABA case)
  * All three collapse "is this handle still meaningful?" into one cheap check.             */
-static tcb_t* resolve_task_handle(task_handle_t h) {
+static __itcm tcb_t* resolve_task_handle(task_handle_t h) {
   if(h == NULL_TASK_HANDLE) {
     return NULL;
   }
@@ -83,7 +83,7 @@ static tcb_t* resolve_task_handle(task_handle_t h) {
   return t;
 }
 
-task_handle_t get_task_handle(void) {
+__itcm task_handle_t get_task_handle(void) {
   if(curr_task == NULL) {
     return NULL_TASK_HANDLE;
   }
@@ -123,7 +123,7 @@ void task_return(void) {
 }
 
 #if CONFIG_USE_TICKLESS_IDLE
-static void tickless_sleep(uint32_t idle_ticks) {
+static __itcm void tickless_sleep(uint32_t idle_ticks) {
   uint32_t per_tick = (GPT_CLK_HZ/TICK_HZ);                   /* 24000 GPT clocks / 1 ms */
   /*
    * max_ticks = 0xFFFFFFFF / 24000 = 178956, so interval can reach 4,294,944,000 —
@@ -175,7 +175,7 @@ static void tickless_sleep(uint32_t idle_ticks) {
   SCB_ICSR = ICSR_PENDSVSET;
 }
 
-static uint32_t get_next_wake(void) {
+static __itcm uint32_t get_next_wake(void) {
   if(delayed_list != NULL) {
     int32_t delta = delayed_list->wake - get_tick_count();
     if(delta > 0) {
@@ -198,7 +198,7 @@ static uint32_t get_next_wake(void) {
 #endif
 
 __attribute__((unused))
-static void task_cleaner(void) {
+static __itcm void task_cleaner(void) {
   /*
    * task_cleaner is just a place holder
    * for when a dynamic-stack is implemented.
@@ -206,7 +206,7 @@ static void task_cleaner(void) {
    */
 }
 
-void idle_task() {
+__itcm void idle_task() {
   while(1) {
 #if CONFIG_USE_IDLE_HOOK
     idle_hook();
@@ -241,7 +241,7 @@ void idle_task() {
   }
 }
 
-void insert_ready_task(tcb_t* t) {
+__itcm void insert_ready_task(tcb_t* t) {
   if(t == NULL) {
     return;
   }
@@ -264,7 +264,7 @@ void insert_ready_task(tcb_t* t) {
   ready_bits |= (1u << p);
 }
 
-static void remove_ready_task(tcb_t* t) {
+static __itcm void remove_ready_task(tcb_t* t) {
   if(t == NULL) {
     return;
   }
@@ -285,7 +285,7 @@ static void remove_ready_task(tcb_t* t) {
   t->next = t->prev = NULL;
 }
 
-static void remove_delayed_task(tcb_t* t) {
+static __itcm void remove_delayed_task(tcb_t* t) {
   tcb_t** pp = &delayed_list;
   while(*pp && *pp != t) {
     pp = &(*pp)->next;
@@ -304,7 +304,7 @@ static void remove_delayed_task(tcb_t* t) {
   }
 }
 
-void wait_abort(tcb_t* t) {
+__itcm void wait_abort(tcb_t* t) {
   if(t == NULL || t->wait_head == NULL) {
     return;
   }
@@ -324,7 +324,7 @@ void wait_abort(tcb_t* t) {
   t->wait_result = 0;
 }
 
-void wait_insert(tcb_t** head, tcb_t* t) {
+__itcm void wait_insert(tcb_t** head, tcb_t* t) {
   if(head == NULL || t == NULL) {
     return;
   }
@@ -346,7 +346,7 @@ void wait_insert(tcb_t** head, tcb_t* t) {
   *pp = t;
 }
 
-tcb_t* wait_pop_highest(tcb_t** head) {
+__itcm tcb_t* wait_pop_highest(tcb_t** head) {
   if(head == NULL) {
     return NULL;
   }
@@ -364,7 +364,7 @@ tcb_t* wait_pop_highest(tcb_t** head) {
   return t;
 }
 
-static void wait_reprioritize(tcb_t* t, uint32_t new_p) {
+static __itcm void wait_reprioritize(tcb_t* t, uint32_t new_p) {
   tcb_t** head = t->wait_head;
   if(*head == NULL) {
     t->priority = new_p;
@@ -387,7 +387,7 @@ static void wait_reprioritize(tcb_t* t, uint32_t new_p) {
   wait_insert(head, t);
 }
 
-void task_set_priority(tcb_t* t, uint32_t new_p) {
+__itcm void task_set_priority(tcb_t* t, uint32_t new_p) {
   if(t == NULL || new_p > MAX_PRIO || t->priority == new_p) {
     return;
   }
@@ -414,14 +414,14 @@ void task_set_priority(tcb_t* t, uint32_t new_p) {
   }
 }
 
-uint8_t task_priority_self(void) {
+__itcm uint8_t task_priority_self(void) {
   if(curr_task == NULL) {
     return 0;
   }
   return curr_task->priority;
 }
 
-void unlink_task_from_list(tcb_t* t) {
+__itcm void unlink_task_from_list(tcb_t* t) {
   switch (t->state) {
     case TASK_RUNNING:
     case TASK_READY:
@@ -441,7 +441,7 @@ void unlink_task_from_list(tcb_t* t) {
   }
 }
 
-static tcb_t* pick_next_task() {
+static __itcm tcb_t* pick_next_task() {
   if(ready_bits == 0) {
     return NULL;
   }
@@ -453,7 +453,7 @@ static tcb_t* pick_next_task() {
   return t;
 }
 
-static void insert_delayed_into(tcb_t** list, tcb_t* t) {
+static __itcm void insert_delayed_into(tcb_t** list, tcb_t* t) {
   tcb_t** pp = list;
   while(*pp && t->wake >= (*pp)->wake) {
     pp = &(*pp)->next;
@@ -463,7 +463,7 @@ static void insert_delayed_into(tcb_t** list, tcb_t* t) {
   *pp = t;
 }
 
-void insert_delayed_task(tcb_t* t, uint32_t now) {
+__itcm void insert_delayed_task(tcb_t* t, uint32_t now) {
   if(t->wake < now) {
     insert_delayed_into(&delayed_list_overflow, t);
   } else {
@@ -471,7 +471,7 @@ void insert_delayed_task(tcb_t* t, uint32_t now) {
   }
 }
 
-void task_delay(uint32_t ms) {
+__itcm void task_delay(uint32_t ms) {
   if(ms == 0) {
     yield();
     return;
@@ -489,7 +489,7 @@ void task_delay(uint32_t ms) {
 }
 
 /* drift resistant delay */
-void task_delay_until(uint32_t* last_wake, uint32_t ms) {
+__itcm void task_delay_until(uint32_t* last_wake, uint32_t ms) {
   if(ms == 0) {
     yield();
     return;
@@ -515,7 +515,7 @@ void task_delay_until(uint32_t* last_wake, uint32_t ms) {
   }
 }
 
-void suspend_task(task_handle_t h) {
+__itcm void suspend_task(task_handle_t h) {
   enter_critical();
     tcb_t* t = resolve_task_handle(h);
     if(t == NULL || t == idle_task_tcb) {
@@ -541,7 +541,7 @@ void suspend_task(task_handle_t h) {
   exit_critical();
 }
 
-void resume_task(task_handle_t h) {
+__itcm void resume_task(task_handle_t h) {
   enter_critical();
     tcb_t* t = resolve_task_handle(h);
     if(t == NULL || t->state != TASK_SUSPEND) {
@@ -568,7 +568,7 @@ void resume_task(task_handle_t h) {
 }
 
 /* Returns 1 if a higher-priority task was readied -> caller should pend PendSV.            */
-int resume_task_isr(task_handle_t h) {
+__itcm int resume_task_isr(task_handle_t h) {
   uint32_t bpr = enter_critical_isr();
     int yield = 0;
     tcb_t* t = resolve_task_handle(h);
@@ -587,7 +587,7 @@ int resume_task_isr(task_handle_t h) {
   return yield;
 }
 
-void kernel_tick(uint32_t now) {
+__itcm void kernel_tick(uint32_t now) {
   static uint32_t last_now = 0;
 
   if(scheduler_suspended) {
@@ -805,7 +805,7 @@ void resume_all_tasks(void) {
 }
 
 // task notifications - start
-uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit) {
+__itcm uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit) {
   if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
@@ -843,7 +843,7 @@ uint32_t notify_take_indexed(uint32_t slot, uint32_t time_out, int clear_on_exit
   return value;
 }
 
-uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exit, uint32_t* out, uint32_t time_out) {
+__itcm uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exit, uint32_t* out, uint32_t time_out) {
   if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
@@ -887,7 +887,7 @@ uint32_t notify_wait_indexed(uint32_t slot, int clear_on_entry, int clear_on_exi
   return got;
 }
 
-static int notify_wake_if_blocked(tcb_t* t, uint32_t slot) {
+static __itcm int notify_wake_if_blocked(tcb_t* t, uint32_t slot) {
   if(t->notify_state[slot] == NOTIFY_WAITING && t->state == TASK_BLOCKED) {
     unlink_task_from_list(t);
     t->state = TASK_READY;
@@ -899,7 +899,7 @@ static int notify_wake_if_blocked(tcb_t* t, uint32_t slot) {
   return 0;
 }
 
-static int notify_apply(tcb_t* t, uint32_t slot, uint32_t value, notify_action_e action, int* preempt) {
+static __itcm int notify_apply(tcb_t* t, uint32_t slot, uint32_t value, notify_action_e action, int* preempt) {
   int delivered = 1;
   switch (action) {
     case NOTIFY_SET_BITS:
@@ -938,7 +938,7 @@ static int notify_apply(tcb_t* t, uint32_t slot, uint32_t value, notify_action_e
   return delivered;
 }
 
-int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
+__itcm int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
   if(slot >= CONFIG_NOTIFY_SLOTS) {
     return -1;
   }
@@ -961,7 +961,7 @@ int notify_indexed(task_handle_t h, uint32_t slot, uint32_t value, notify_action
   return delivered;
 }
 
-uint32_t notify_indexed_from_isr(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
+__itcm uint32_t notify_indexed_from_isr(task_handle_t h, uint32_t slot, uint32_t value, notify_action_e action) {
   if(slot >= CONFIG_NOTIFY_SLOTS) {
     return 0;
   }
@@ -981,7 +981,7 @@ uint32_t notify_indexed_from_isr(task_handle_t h, uint32_t slot, uint32_t value,
 }
 // task notifications - end
 
-void scheduler(void) {
+__itcm void scheduler(void) {
   if(scheduler_suspended) {
     return;
   }

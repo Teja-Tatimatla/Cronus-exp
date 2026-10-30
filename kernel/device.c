@@ -33,9 +33,7 @@ static void init(const struct device* s, const struct device* e, int* failed) {
       continue;
     }
 
-    uint32_t t0 = DWT_CYCCNT;
     int rc = d->init ? d->init(d) : 0;
-    d->state->init_cycles = DWT_CYCCNT - t0;
     d->state->ready = (rc == 0) ? 1 : 0;
     d->state->init_res = (int8_t)rc;
     d->state->suspended = 0;
@@ -124,10 +122,9 @@ int device_power_all(int suspend) {
 
 static void reporter(const struct device* s, const struct device* e) {
   for(const struct device* d = s; d < e; d++) {
-    uart_printf(" %s: level %u, ready %u, rc %d, init %u us, api %u\r\n",
+    uart_printf(" %s: level %u, ready %u, rc %d, api %u\r\n",
       d->name, (unsigned)d->level, (unsigned)d->state->ready,
-      (int)d->state->init_res, (unsigned)d->state->init_cycles,
-      (unsigned)(uintptr_t)d->api);
+      (int)d->state->init_res, (unsigned)(uintptr_t)d->api);
   }
 }
 

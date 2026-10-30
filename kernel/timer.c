@@ -7,6 +7,7 @@
 #include <cronus/tasks.h>
 #include <systick.h>
 #include <uart.h>
+#include <cm7.h>
 
 typedef enum {
   TCMD_START = 0,
@@ -200,7 +201,7 @@ void init_timer_daemon(uint32_t* stack) {
   create_task(stack, timer_daemon, CONFIG_TIMER_TASK_STACK, CONFIG_TIMER_TASK_PRIORITY, "timerd");
 }
 
-static int post(timer_t* t, uint8_t cmd, uint32_t arg, uint32_t timeout) {
+static __itcm int post(timer_t* t, uint8_t cmd, uint32_t arg, uint32_t timeout) {
   timer_cmd_t c;
   c.timer = t;
   c.pend_func = NULL;
@@ -248,7 +249,7 @@ int timer_pend_function(timer_pendfn_t fn, void* parg, uint32_t arg, uint32_t ti
   return (queue_send(&cmd_q, &c, timeout) == 1) ? 1 : 0;
 }
 
-int timer_start_from_isr(timer_t* t) {
+__itcm int timer_start_from_isr(timer_t* t) {
   timer_cmd_t c;
   c.timer = t;
   c.pend_func = NULL;
@@ -260,7 +261,7 @@ int timer_start_from_isr(timer_t* t) {
   return queue_send_from_isr(&cmd_q, &c);
 }
 
-int timer_pend_function_from_isr(timer_pendfn_t fn, void* parg, uint32_t arg) {
+__itcm int timer_pend_function_from_isr(timer_pendfn_t fn, void* parg, uint32_t arg) {
   timer_cmd_t c;
   c.timer = (timer_t *)0;
   c.pend_func = fn;

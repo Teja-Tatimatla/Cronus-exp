@@ -1,7 +1,7 @@
   .syntax unified
   .cpu cortex-m7
   .thumb
-  .section .text
+  .section .itcm.text, "ax", %progbits
 
   .global SVC_Handler
   .thumb_func
@@ -23,7 +23,7 @@ SVC_Handler:
   .thumb_func
 PendSV_Handler:
   mrs   r0, psp
-  tst   lr, 0x10
+  tst   lr, #0x10
   it    eq
   vstmdbeq  r0!, {s16-s31}
   stmdb r0!, {r4-r11, lr}
