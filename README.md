@@ -1,34 +1,44 @@
 # Cronus
 
 A from-scratch preemptive RTOS for the ARM Cortex-M7 (Teensy 4.1 / i.MX RT1062).
-No SDK, no CMSIS, no Arduino — every register touched by hand.
+No SDK, no CMSIS, no Arduino.
 
-Named for the Titan of time who ruled the others; the kernel internals follow a
-Greek-cosmology scheme documented in `docs/architecture.md`. Source files keep
-plain, descriptive names — poetry in the docs, clarity in the code.
+> This is my from-scratch RTOS and learning journey. I've learned from
+> *Real-Time Operating Systems for ARM Cortex-M Microcontrollers* by Jonathan
+> Valvano, *The Definitive Guide to the ARM Cortex-M3* (2nd edition) by Joseph
+> Yiu, and many online resources. I asked Claude to structure a course for me,
+> with exercises that build towards a fully functioning RTOS. I try to implement
+> each feature myself, then ask it to check my work and point out any
+> shortcomings. Once I'm clear on the concepts, I plan on rebuilding the entire
+> repo from scratch, again, using only reference manuals.
+
+For example, this is [Phase 2 Exercise 1](docs/exercises/p2-01-semaphore.md).
 
 ## Layout
 
-  arch/    ARM Cortex-M7 core (any M7): startup, vectors, DWT, context switch
-  bsp/     i.MX RT1062 + Teensy 4.1: boot (FlexSPI/IVT), clock, pin map
-  kernel/  RTOS core: scheduler, IPC, timers   (Phase 1+)
-  drivers/ driver framework + UART/SPI/GPIO     (Phase 2)
-  app/     entry point / current exercise
-  include/cronus/  public API + config knobs
+```
+arch/            ARM Cortex-M7 core (any M7): startup, vectors, DWT, context switch
+bsp/             i.MX RT1062 + Teensy 4.1: boot (FlexSPI/IVT), clock, pin map
+kernel/          RTOS core: scheduler, IPC, timers   (Phase 1+)
+drivers/         driver framework + UART/SPI/GPIO     (Phase 2)
+app/             entry point / current exercise
+include/cronus/  public API + config knobs
+```
 
 ## Build / Flash / Run
+
 ```cmd
-  make build     # configure + compile -> build/cronus.hex
-  make flash     # build, then flash over USB (press the Teensy button if prompted)
-  make clean
+make build     # configure + compile -> build/cronus.hex
+make flash     # build, then flash over USB (press the Teensy button if prompted)
+make clean
 ```
 
 ## Zed
-```cmd
-   make build
-   ln -sf build/compile_commands.json compile_commands.json
-```
 
+```cmd
+make build
+ln -sf build/compile_commands.json compile_commands.json
+```
 
 ## Notes / known limits
 
